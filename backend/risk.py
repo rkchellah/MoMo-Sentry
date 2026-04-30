@@ -1,18 +1,19 @@
 """
 risk.py — Risk scoring logic
 
-Takes SIM Swap and Device Status signals and returns a verdict.
+Takes SIM Swap, Device Swap, and Device Status signals
+and returns a verdict.
 
 Verdict levels:
   SAFE    — no suspicious signals, proceed with transaction
   CAUTION — something is off, agent should ask questions
   STOP    — high fraud risk, do not release cash
 
-The logic is intentionally transparent so the agent understands why.
+Weights are transparent and explainable. No black box.
 """
 
 from dataclasses import dataclass
-from camara import SimSwapResult, DeviceStatusResult
+from camara import SimSwapResult, DeviceSwapResult, DeviceStatusResult
 
 
 @dataclass
@@ -20,60 +21,73 @@ class RiskVerdict:
     verdict: str        # SAFE | CAUTION | STOP
     score: float        # 0.0 to 1.0, higher = more risky
     signals: list[str]  # what triggered this verdict
-    reason: str         # one plain sentence for the agent
+    reason: str         # one plain sentence for the Groq agent to build on
 
 
-def score(sim: SimSwapResult, device: DeviceStatusResult) -> RiskVerdict:
+def score(
+    sim: SimSwapResult,
+    device_swap: DeviceSwapResult,
+    device: DeviceStatusResult,
+) -> RiskVerdict:
     """
-    Score the risk based on CAMARA API signals.
+    Score the risk based on all CAMARA signals.
 
-    Scoring logic:
-      - SIM swapped within 72h:     +0.6 (major red flag)
-      - Device not connected:       +0.25
-      - Device roaming unexpectedly:+0.15
-      - API errors on either check: +0.1 per error (uncertainty)
+    Weights:
+      SIM swapped in 72h:      +0.60  strongest fraud indicator
+      Device swapped in 72h:   +0.25  reinforces SIM swap signal
+      Device not connected:    +0.25  unusual for active MoMo user
+      Device on SMS only:      +0.10  degraded connectivity
+      Device roaming:          +0.15  unexpected for local transaction
+      API error on any check:  +0.10  uncertainty is itself a signal
     """
     risk_score = 0.0
     signals = []
 
-    # --- SIM Swap signal (most important) ---
+    # --- SIM Swap (most important signal) ---
     if sim.error:
-        risk_score += 0.1
+        risk_score += 0.10
         signals.append(f"SIM check failed: {sim.error}")
     elif sim.swapped:
-        risk_score += 0.6
+        risk_score += 0.60
         timestamp = sim.latest_sim_change or "unknown time"
         signals.append(f"SIM was swapped recently (last change: {timestamp})")
 
-    # --- Device Status signal ---
+    # --- Device Swap (reinforces SIM swap) ---
+    if device_swap.error:
+        risk_score += 0.10
+        signals.append(f"Device swap check failed: {device_swap.error}")
+    elif device_swap.swapped:
+        risk_score += 0.25
+        timestamp = device_swap.latest_device_change or "unknown time"
+        signals.append(f"Device was also swapped recently (last change: {timestamp})")
+
+    # --- Device Status ---
     if device.error:
-        risk_score += 0.1
+        risk_score += 0.10
         signals.append(f"Device status check failed: {device.error}")
     else:
         if device.connectivity == "NOT_CONNECTED":
             risk_score += 0.25
             signals.append("Device is not connected to the network")
         elif device.connectivity == "CONNECTED_SMS":
-            risk_score += 0.1
-            signals.append("Device is on SMS only, not data — unusual for active MoMo use")
+            risk_score += 0.10
+            signals.append("Device is on SMS only — not on data")
 
         if device.roaming:
             risk_score += 0.15
             signals.append("Device is currently roaming")
 
-    # Cap at 1.0
     risk_score = min(risk_score, 1.0)
 
-    # --- Determine verdict ---
-    if risk_score >= 0.6:
+    # --- Verdict ---
+    if risk_score >= 0.60:
         verdict = "STOP"
-        reason = _build_reason("STOP", signals, sim, device)
     elif risk_score >= 0.25:
         verdict = "CAUTION"
-        reason = _build_reason("CAUTION", signals, sim, device)
     else:
         verdict = "SAFE"
-        reason = _build_reason("SAFE", signals, sim, device)
+
+    reason = _build_reason(verdict, signals, sim, device_swap)
 
     return RiskVerdict(
         verdict=verdict,
@@ -83,17 +97,29 @@ def score(sim: SimSwapResult, device: DeviceStatusResult) -> RiskVerdict:
     )
 
 
-def _build_reason(verdict: str, signals: list[str], sim: SimSwapResult, device: DeviceStatusResult) -> str:
+def _build_reason(
+    verdict: str,
+    signals: list[str],
+    sim: SimSwapResult,
+    device_swap: DeviceSwapResult,
+) -> str:
     """
-    Build a plain one-sentence reason for the agent.
-    This gets passed to Groq for natural language narration.
+    Build a plain sentence summary for the Groq agent to narrate from.
     """
     if verdict == "STOP":
+        if sim.swapped and device_swap.swapped:
+            return (
+                "Both the SIM and the device were recently swapped — "
+                "this is a strong fraud signal. Do not release cash."
+            )
         if sim.swapped:
-            return f"SIM was recently swapped — do not release cash until you confirm this person's identity by another means."
+            return "SIM was recently swapped. Do not release cash until identity is confirmed."
         return f"Multiple risk signals detected: {'; '.join(signals)}."
 
     if verdict == "CAUTION":
-        return f"Something is slightly off — {signals[0].lower()} — ask the customer a verification question before proceeding."
+        return (
+            f"One risk signal detected — {signals[0].lower()} — "
+            "ask the customer a verification question before proceeding."
+        )
 
-    return "No suspicious signals detected. SIM is stable and device is connected."
+    return "No suspicious signals. SIM and device are stable."

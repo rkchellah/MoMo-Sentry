@@ -3,11 +3,8 @@ main.py — MoMo Sentry FastAPI backend
 
 Three endpoints:
   POST /check   — run a fraud check on a phone number
-  GET  /flags   — get recent flagged checks (feeds the map)
+  GET  /flags   — get recent flagged checks for the map
   GET  /health  — confirm the API is alive
-
-The check endpoint calls Nokia NaC APIs in parallel,
-scores the result, then asks Groq to narrate the verdict.
 """
 
 import os
@@ -25,7 +22,7 @@ import camara
 import risk
 import agent
 
-# Supabase is optional — if not configured, checks still work,
+# Supabase is optional — checks still work without it,
 # they just won't appear on the map
 try:
     from supabase import create_client
@@ -47,7 +44,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Tighten this in production
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -57,21 +54,23 @@ app.add_middleware(
 
 class CheckRequest(BaseModel):
     phone_number: str
-    agent_location: str = "Unknown"  # neighbourhood, e.g. "Kanyama"
+    agent_location: str = "Unknown"
 
 
 class CheckResponse(BaseModel):
     check_id: str
     phone_number: str
-    verdict: str          # SAFE | CAUTION | STOP
-    score: float          # 0.0 to 1.0
-    narration: str        # plain English from Groq
-    signals: list[str]    # what triggered this verdict
+    verdict: str
+    score: float
+    narration: str
+    signals: list[str]
     sim_swapped: bool
     last_sim_change: str | None
+    device_swapped: bool
+    last_device_change: str | None
     device_connectivity: str
     device_roaming: bool
-    checked_at: str       # ISO timestamp
+    checked_at: str
 
 
 class FlagEntry(BaseModel):
@@ -102,30 +101,32 @@ async def check_number(
     """
     Run a fraud check on a mobile number.
 
-    Calls Nokia NaC SIM Swap + Device Status in parallel,
-    scores the signals, then asks Groq to narrate the verdict.
+    Calls Nokia NaC SIM Swap + Device Swap + Device Status in parallel,
+    scores the signals, then asks Groq to narrate the verdict in plain English.
 
-    Session ID header keeps the Groq agent's memory alive
-    across multiple checks by the same booth agent.
+    The x-session-id header keeps Groq's memory alive across multiple
+    checks by the same agent in the same session.
     """
-    # Use provided session or create a new one
     session_id = x_session_id or str(uuid.uuid4())
     check_id = str(uuid.uuid4())
     checked_at = datetime.now(timezone.utc).isoformat()
 
-    # Run Nokia NaC checks in parallel
-    sim_result, device_result = await camara.run_checks(body.phone_number)
+    # Run all Nokia NaC checks in parallel
+    sim_result, device_swap_result, device_status_result = await camara.run_checks(
+        body.phone_number
+    )
 
     # Score the risk
-    verdict = risk.score(sim_result, device_result)
+    verdict = risk.score(sim_result, device_swap_result, device_status_result)
 
-    # Ask Groq to narrate
+    # Ask Groq to narrate in plain English
     narration = agent.narrate(
         session_id=session_id,
         phone_number=body.phone_number,
         verdict=verdict,
         sim=sim_result,
-        device=device_result,
+        device_swap=device_swap_result,
+        device=device_status_result,
     )
 
     # Log to Supabase if available
@@ -140,8 +141,10 @@ async def check_number(
                 "narration": narration,
                 "sim_swapped": sim_result.swapped,
                 "last_sim_change": sim_result.latest_sim_change,
-                "device_connectivity": device_result.connectivity,
-                "device_roaming": device_result.roaming,
+                "device_swapped": device_swap_result.swapped,
+                "last_device_change": device_swap_result.latest_device_change,
+                "device_connectivity": device_status_result.connectivity,
+                "device_roaming": device_status_result.roaming,
                 "agent_location": body.agent_location,
                 "checked_at": checked_at,
             }).execute()
@@ -158,8 +161,10 @@ async def check_number(
         signals=verdict.signals,
         sim_swapped=sim_result.swapped,
         last_sim_change=sim_result.latest_sim_change,
-        device_connectivity=device_result.connectivity,
-        device_roaming=device_result.roaming,
+        device_swapped=device_swap_result.swapped,
+        last_device_change=device_swap_result.latest_device_change,
+        device_connectivity=device_status_result.connectivity,
+        device_roaming=device_status_result.roaming,
         checked_at=checked_at,
     )
 
@@ -167,8 +172,7 @@ async def check_number(
 @app.get("/flags", response_model=list[FlagEntry])
 async def get_flags(limit: int = 50):
     """
-    Return recent flagged checks for the map.
-    Only returns CAUTION and STOP verdicts.
+    Return recent CAUTION and STOP checks for the fraud map.
     """
     if not SUPABASE_ENABLED or not _supabase:
         return []

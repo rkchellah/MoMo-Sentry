@@ -1,24 +1,22 @@
 """
 agent.py — Groq AI agent with persistent session memory
 
-The agent holds conversation history per session.
-This means it can say "this is the second suspicious number
-from Kanyama today" — it knows what happened before.
+Holds conversation history per session so the agent remembers
+what it saw earlier in the same shift. If the second number checked
+is also flagged from the same area, the agent notices.
 
-That's the difference between a lookup tool and an intelligent agent.
+That's the difference between a lookup tool and something that thinks.
 """
 
 import os
 from groq import Groq
 from risk import RiskVerdict
-from camara import SimSwapResult, DeviceStatusResult
+from camara import SimSwapResult, DeviceSwapResult, DeviceStatusResult
 
 
-# One Groq client, reused across requests
 _client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
 # In-memory session store: session_id → message history
-# In production this would live in Redis or Supabase
 _sessions: dict[str, list[dict]] = {}
 
 SYSTEM_PROMPT = """You are MoMo Sentry, a fraud detection assistant for mobile money booth agents in Zambia.
@@ -29,7 +27,8 @@ Rules:
 - Keep responses to 1-2 sentences maximum
 - Be direct. Agents are busy. No pleasantries.
 - Use clear action words: "Do not release cash", "Proceed carefully", "Safe to proceed"
-- When a SIM swap is detected, always say when it happened if you know
+- When a SIM swap is detected, always mention it clearly
+- When both SIM and device were swapped, say both — that is a strong signal
 - Remember previous checks in this session — if you see a pattern, mention it
 - Write like a trusted colleague warning you, not like a software system
 - Never use technical jargon like "API", "connectivity status", "risk score"
@@ -47,26 +46,28 @@ def narrate(
     phone_number: str,
     verdict: RiskVerdict,
     sim: SimSwapResult,
+    device_swap: DeviceSwapResult,
     device: DeviceStatusResult,
 ) -> str:
     """
     Ask Groq to narrate the risk verdict in plain language.
-    The session history gives the agent context across multiple checks.
+    Session history gives context across multiple checks.
     """
     history = _get_session(session_id)
 
-    # Build the context message for this check
     context = f"""
 Phone number checked: {phone_number}
 Verdict: {verdict.verdict}
 Risk score: {verdict.score}
-Signals detected: {'; '.join(verdict.signals) if verdict.signals else 'None'}
+Signals: {'; '.join(verdict.signals) if verdict.signals else 'None'}
 SIM swapped recently: {sim.swapped}
 Last SIM change: {sim.latest_sim_change or 'Unknown'}
+Device swapped recently: {device_swap.swapped}
+Last device change: {device_swap.latest_device_change or 'Unknown'}
 Device connectivity: {device.connectivity}
 Device roaming: {device.roaming}
 
-Based on this, give the agent a 1-2 sentence verdict they can act on immediately.
+Give the agent a 1-2 sentence verdict they can act on immediately.
 """
 
     history.append({"role": "user", "content": context})
@@ -75,12 +76,10 @@ Based on this, give the agent a 1-2 sentence verdict they can act on immediately
         model="llama-3.3-70b-versatile",
         messages=[{"role": "system", "content": SYSTEM_PROMPT}] + history,
         max_tokens=150,
-        temperature=0.3,  # Low temperature = consistent, reliable output
+        temperature=0.3,
     )
 
     narration = response.choices[0].message.content.strip()
-
-    # Save the response to history so the agent remembers it
     history.append({"role": "assistant", "content": narration})
 
     # Keep history bounded — last 20 exchanges per session
@@ -91,5 +90,4 @@ Based on this, give the agent a 1-2 sentence verdict they can act on immediately
 
 
 def clear_session(session_id: str) -> None:
-    """Clear the session history for a given agent."""
     _sessions.pop(session_id, None)
