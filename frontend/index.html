@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MoMo Sentry</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f1117;
+      color: #f0f0f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+    }
+
+    header {
+      width: 100%;
+      max-width: 480px;
+      margin-bottom: 32px;
+    }
+
+    .logo {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.5px;
+    }
+
+    .logo span {
+      color: #22c55e;
+    }
+
+    .tagline {
+      font-size: 13px;
+      color: #6b7280;
+      margin-top: 4px;
+    }
+
+    .card {
+      background: #1a1d27;
+      border: 1px solid #2a2d3a;
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: #9ca3af;
+      margin-bottom: 8px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      background: #0f1117;
+      border: 1px solid #2a2d3a;
+      border-radius: 8px;
+      color: #f0f0f0;
+      font-size: 18px;
+      padding: 12px 16px;
+      outline: none;
+      transition: border-color 0.15s;
+      letter-spacing: 1px;
+    }
+
+    input[type="text"]:focus {
+      border-color: #22c55e;
+    }
+
+    input[type="text"]::placeholder {
+      color: #374151;
+      letter-spacing: 0;
+    }
+
+    .location-row {
+      margin-top: 12px;
+    }
+
+    select {
+      width: 100%;
+      background: #0f1117;
+      border: 1px solid #2a2d3a;
+      border-radius: 8px;
+      color: #9ca3af;
+      font-size: 14px;
+      padding: 10px 16px;
+      outline: none;
+    }
+
+    button {
+      width: 100%;
+      background: #22c55e;
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 14px;
+      cursor: pointer;
+      margin-top: 16px;
+      transition: background 0.15s;
+    }
+
+    button:hover { background: #16a34a; }
+    button:disabled { background: #374151; color: #6b7280; cursor: not-allowed; }
+
+    /* Result card */
+    .result {
+      width: 100%;
+      max-width: 480px;
+      margin-top: 16px;
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: none;
+      border: 1px solid;
+    }
+
+    .result.SAFE    { background: #052e16; border-color: #166534; }
+    .result.CAUTION { background: #1c1502; border-color: #713f12; }
+    .result.STOP    { background: #1f0606; border-color: #7f1d1d; }
+
+    .verdict-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .verdict-badge {
+      font-size: 13px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 99px;
+      letter-spacing: 1px;
+    }
+
+    .SAFE .verdict-badge    { background: #22c55e; color: #000; }
+    .CAUTION .verdict-badge { background: #f59e0b; color: #000; }
+    .STOP .verdict-badge    { background: #ef4444; color: #fff; }
+
+    .verdict-score {
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    .narration {
+      font-size: 15px;
+      line-height: 1.6;
+      color: #e5e7eb;
+      margin-bottom: 12px;
+    }
+
+    .signals {
+      list-style: none;
+      margin-top: 8px;
+    }
+
+    .signals li {
+      font-size: 12px;
+      color: #9ca3af;
+      padding: 3px 0;
+    }
+
+    .signals li::before {
+      content: "→ ";
+      color: #4b5563;
+    }
+
+    .meta {
+      font-size: 11px;
+      color: #4b5563;
+      margin-top: 12px;
+    }
+
+    /* History */
+    .history {
+      width: 100%;
+      max-width: 480px;
+      margin-top: 24px;
+    }
+
+    .history h3 {
+      font-size: 12px;
+      color: #4b5563;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #1a1d27;
+      font-size: 13px;
+    }
+
+    .history-number { color: #9ca3af; font-family: monospace; }
+    .history-time   { color: #4b5563; font-size: 11px; }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+    }
+    .dot.SAFE    { background: #22c55e; }
+    .dot.CAUTION { background: #f59e0b; }
+    .dot.STOP    { background: #ef4444; }
+
+    /* Loading spinner */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid #374151;
+      border-top-color: #22c55e;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">MoMo <span>Sentry</span></div>
+    <div class="tagline">SIM swap fraud detection for mobile money agents</div>
+  </header>
+
+  <div class="card">
+    <label for="phone">Customer phone number</label>
+    <input
+      type="text"
+      id="phone"
+      placeholder="+260971234567"
+      autocomplete="off"
+      inputmode="tel"
+    />
+
+    <div class="location-row">
+      <label for="location">Your location</label>
+      <select id="location">
+        <option value="Unknown">Select area</option>
+        <option value="Kanyama">Kanyama</option>
+        <option value="Matero">Matero</option>
+        <option value="Chilenje">Chilenje</option>
+        <option value="Ngombe">Ngombe</option>
+        <option value="Kalingalinga">Kalingalinga</option>
+        <option value="Chawama">Chawama</option>
+        <option value="Mandevu">Mandevu</option>
+        <option value="Kabwata">Kabwata</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+
+    <button id="checkBtn" onclick="runCheck()">Check Number</button>
+  </div>
+
+  <div class="result" id="result">
+    <div class="verdict-row">
+      <span class="verdict-badge" id="verdictBadge"></span>
+      <span class="verdict-score" id="verdictScore"></span>
+    </div>
+    <div class="narration" id="narration"></div>
+    <ul class="signals" id="signals"></ul>
+    <div class="meta" id="meta"></div>
+  </div>
+
+  <div class="history" id="historySection" style="display:none">
+    <h3>This session</h3>
+    <div id="historyList"></div>
+  </div>
+
+  <script>
+    // Point this at your backend
+    const API_BASE = "http://localhost:8000";
+
+    // Generate a session ID once per page load
+    // This is what keeps the Groq agent's memory alive
+    const SESSION_ID = crypto.randomUUID();
+
+    const checks = [];
+
+    async function runCheck() {
+      const phone = document.getElementById("phone").value.trim();
+      const location = document.getElementById("location").value;
+
+      if (!phone) {
+        document.getElementById("phone").focus();
+        return;
+      }
+
+      const btn = document.getElementById("checkBtn");
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>Checking...';
+
+      try {
+        const response = await fetch(`${API_BASE}/check`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-session-id": SESSION_ID,
+          },
+          body: JSON.stringify({
+            phone_number: phone,
+            agent_location: location,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        showResult(data);
+        addToHistory(data);
+
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Check Number";
+      }
+    }
+
+    function showResult(data) {
+      const resultEl = document.getElementById("result");
+      resultEl.className = `result ${data.verdict}`;
+      resultEl.style.display = "block";
+
+      document.getElementById("verdictBadge").textContent = data.verdict;
+      document.getElementById("verdictScore").textContent =
+        `Risk: ${Math.round(data.score * 100)}%`;
+
+      document.getElementById("narration").textContent = data.narration;
+
+      const signalsList = document.getElementById("signals");
+      signalsList.innerHTML = "";
+      if (data.signals.length > 0) {
+        data.signals.forEach(s => {
+          const li = document.createElement("li");
+          li.textContent = s;
+          signalsList.appendChild(li);
+        });
+      }
+
+      const time = new Date(data.checked_at).toLocaleTimeString();
+      document.getElementById("meta").textContent =
+        `Checked at ${time} · Check ID: ${data.check_id.slice(0, 8)}`;
+
+      resultEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    function addToHistory(data) {
+      checks.unshift(data);
+
+      const section = document.getElementById("historySection");
+      const list = document.getElementById("historyList");
+      section.style.display = "block";
+
+      list.innerHTML = checks.slice(0, 10).map(c => `
+        <div class="history-item">
+          <span>
+            <span class="dot ${c.verdict}"></span>
+            <span class="history-number">${c.phone_number}</span>
+          </span>
+          <span class="history-time">
+            ${new Date(c.checked_at).toLocaleTimeString()}
+          </span>
+        </div>
+      `).join("");
+    }
+
+    function showError(message) {
+      const resultEl = document.getElementById("result");
+      resultEl.className = "result STOP";
+      resultEl.style.display = "block";
+      document.getElementById("verdictBadge").textContent = "ERROR";
+      document.getElementById("verdictScore").textContent = "";
+      document.getElementById("narration").textContent = message;
+      document.getElementById("signals").innerHTML = "";
+      document.getElementById("meta").textContent = "";
+    }
+
+    // Allow Enter key to trigger check
+    document.getElementById("phone").addEventListener("keydown", e => {
+      if (e.key === "Enter") runCheck();
+    });
+  </script>
+
+</body>
+</html>
