@@ -2,14 +2,19 @@
 main.py — MoMo Sentry FastAPI backend
 
 Three endpoints:
-  POST /check   — run a fraud check on a phone number
+  POST /check   — run an agentic fraud check on a phone number
   GET  /flags   — get recent flagged checks for the map
   GET  /health  — confirm the API is alive
+
+The /check endpoint now uses an agentic AI loop.
+The agent decides which Nokia NaC tools to call,
+calls them, reasons over the results, and returns a verdict.
 """
 
 import os
 import uuid
 from datetime import datetime, timezone
+from typing import Optional, List
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,12 +23,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-import camara
-import risk
 import agent
 
-# Supabase is optional — checks still work without it,
-# they just won't appear on the map
+# Supabase is optional — checks still work without it
 try:
     from supabase import create_client
     _supabase = create_client(
@@ -31,15 +33,16 @@ try:
         os.environ["SUPABASE_SERVICE_KEY"],
     )
     SUPABASE_ENABLED = True
-except Exception:
+except Exception as e:
+    print(f"Supabase init failed: {e}")
     _supabase = None
     SUPABASE_ENABLED = False
 
 
 app = FastAPI(
     title="MoMo Sentry",
-    description="Real-time SIM swap fraud detection for mobile money booth agents",
-    version="1.0.0",
+    description="Agentic SIM swap fraud detection for mobile money booth agents",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -61,15 +64,9 @@ class CheckResponse(BaseModel):
     check_id: str
     phone_number: str
     verdict: str
-    score: float
     narration: str
-    signals: list[str]
-    sim_swapped: bool
-    last_sim_change: str | None
-    device_swapped: bool
-    last_device_change: str | None
-    device_connectivity: str
-    device_roaming: bool
+    signals: List[str]
+    tool_calls_made: List[str]
     checked_at: str
 
 
@@ -89,7 +86,8 @@ async def health():
     return {
         "status": "ok",
         "supabase": SUPABASE_ENABLED,
-        "version": "1.0.0",
+        "version": "2.0.0",
+        "mode": "agentic",
     }
 
 
@@ -99,77 +97,67 @@ async def check_number(
     x_session_id: str = Header(default=None),
 ):
     """
-    Run a fraud check on a mobile number.
+    Run an agentic fraud check on a mobile number.
 
-    Calls Nokia NaC SIM Swap + Device Swap + Device Status in parallel,
-    scores the signals, then asks Groq to narrate the verdict in plain English.
+    The AI agent decides which Nokia NaC tools to call,
+    calls them in sequence, reasons over the results,
+    and returns a verdict in plain English.
 
-    The x-session-id header keeps Groq's memory alive across multiple
-    checks by the same agent in the same session.
+    The x-session-id header keeps the agent's memory alive
+    across multiple checks in the same booth agent session.
     """
-    session_id = x_session_id or str(uuid.uuid4())
-    check_id = str(uuid.uuid4())
-    checked_at = datetime.now(timezone.utc).isoformat()
+    try:
+        session_id = x_session_id or str(uuid.uuid4())
+        check_id = str(uuid.uuid4())
+        checked_at = datetime.now(timezone.utc).isoformat()
 
-    # Run all Nokia NaC checks in parallel
-    sim_result, device_swap_result, device_status_result = await camara.run_checks(
-        body.phone_number
-    )
+        # Run the agentic check
+        result = await agent.run_agent(
+            session_id=session_id,
+            phone_number=body.phone_number,
+            agent_location=body.agent_location,
+        )
 
-    # Score the risk
-    verdict = risk.score(sim_result, device_swap_result, device_status_result)
+        # Log to Supabase if available
+        if SUPABASE_ENABLED and _supabase:
+            try:
+                _supabase.table("fraud_checks").insert({
+                    "id": check_id,
+                    "phone_number": body.phone_number,
+                    "verdict": result["verdict"],
+                    "score": 1.0 if result["verdict"] == "STOP" else 0.5 if result["verdict"] == "CAUTION" else 0.0,
+                    "signals": result["signals"],
+                    "narration": result["narration"],
+                    "sim_swapped": any("SIM was swapped" in s for s in result["signals"]),
+                    "last_sim_change": None,
+                    "device_swapped": any("Device was also swapped" in s for s in result["signals"]),
+                    "last_device_change": None,
+                    "device_connectivity": "UNKNOWN",
+                    "device_roaming": any("roaming" in s for s in result["signals"]),
+                    "agent_location": body.agent_location,
+                    "checked_at": checked_at,
+                }).execute()
+            except Exception as e:
+                print(f"Supabase log failed: {e}")
 
-    # Ask Groq to narrate in plain English
-    narration = agent.narrate(
-        session_id=session_id,
-        phone_number=body.phone_number,
-        verdict=verdict,
-        sim=sim_result,
-        device_swap=device_swap_result,
-        device=device_status_result,
-    )
+        return CheckResponse(
+            check_id=check_id,
+            phone_number=body.phone_number,
+            verdict=result["verdict"],
+            narration=result["narration"],
+            signals=result["signals"],
+            tool_calls_made=result["tool_calls_made"],
+            checked_at=checked_at,
+        )
 
-    # Log to Supabase if available
-    if SUPABASE_ENABLED and _supabase:
-        try:
-            _supabase.table("fraud_checks").insert({
-                "id": check_id,
-                "phone_number": body.phone_number,
-                "verdict": verdict.verdict,
-                "score": verdict.score,
-                "signals": verdict.signals,
-                "narration": narration,
-                "sim_swapped": sim_result.swapped,
-                "last_sim_change": sim_result.latest_sim_change,
-                "device_swapped": device_swap_result.swapped,
-                "last_device_change": device_swap_result.latest_device_change,
-                "device_connectivity": device_status_result.connectivity,
-                "device_roaming": device_status_result.roaming,
-                "agent_location": body.agent_location,
-                "checked_at": checked_at,
-            }).execute()
-        except Exception as e:
-            # Don't fail the check if logging fails
-            print(f"Supabase log failed: {e}")
-
-    return CheckResponse(
-        check_id=check_id,
-        phone_number=body.phone_number,
-        verdict=verdict.verdict,
-        score=verdict.score,
-        narration=narration,
-        signals=verdict.signals,
-        sim_swapped=sim_result.swapped,
-        last_sim_change=sim_result.latest_sim_change,
-        device_swapped=device_swap_result.swapped,
-        last_device_change=device_swap_result.latest_device_change,
-        device_connectivity=device_status_result.connectivity,
-        device_roaming=device_status_result.roaming,
-        checked_at=checked_at,
-    )
+    except Exception as e:
+        print(f"CHECK ENDPOINT ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/flags", response_model=list[FlagEntry])
+@app.get("/flags", response_model=List[FlagEntry])
 async def get_flags(limit: int = 50):
     """
     Return recent CAUTION and STOP checks for the fraud map.

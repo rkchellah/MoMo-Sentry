@@ -92,3 +92,23 @@ Dropped the separate "flagged number" test entirely. The simulator returns `swap
 Simulator behaviour does not always match documentation. Test against what actually responds, not what the docs imply should work. Don't waste time trying to find a number that returns a specific simulated value — the simulator is for endpoint validation, not scenario testing.
 
 ---
+
+## BUG-005 — Groq model decommissioned: llama3-groq-70b-8192-tool-use-preview
+
+**Date:** 2026-05-02  
+**File:** `backend/agent.py`  
+**Symptom:**
+```
+Error code: 400 - model_decommissioned
+The model llama3-groq-70b-8192-tool-use-preview has been decommissioned
+```
+**Cause:**  
+Groq deprecated the preview tool-use models on January 6, 2025. The `llama3-groq-70b-8192-tool-use-preview` model no longer exists.
+
+**Fix:**  
+Changed model to `llama-3.3-70b-versatile` which is the recommended replacement and supports tool calling natively.
+
+**Lesson:**  
+Preview models get deprecated fast. Always use production model IDs, not preview ones.
+
+---
