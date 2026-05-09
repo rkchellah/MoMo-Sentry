@@ -18,7 +18,7 @@ from typing import Optional, List
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -58,8 +58,15 @@ app.add_middleware(
 class CheckRequest(BaseModel):
     phone_number: str
     agent_location: str = "Unknown"
+    location: Optional[str] = None
     agent_id: Optional[str] = None
     agent_name: Optional[str] = None
+
+    @model_validator(mode='after')
+    def use_location_fallback(self):
+        if self.agent_location == "Unknown" and self.location:
+            self.agent_location = self.location
+        return self
 
 
 class CheckResponse(BaseModel):
