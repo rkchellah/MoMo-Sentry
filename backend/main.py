@@ -58,6 +58,8 @@ app.add_middleware(
 class CheckRequest(BaseModel):
     phone_number: str
     agent_location: str = "Unknown"
+    agent_id: Optional[str] = None
+    agent_name: Optional[str] = None
 
 
 class CheckResponse(BaseModel):
@@ -68,6 +70,8 @@ class CheckResponse(BaseModel):
     signals: List[str]
     tool_calls_made: List[str]
     checked_at: str
+    agent_id: Optional[str] = None
+    agent_name: Optional[str] = None
 
 
 class FlagEntry(BaseModel):
@@ -135,6 +139,8 @@ async def check_number(
                     "device_connectivity": "UNKNOWN",
                     "device_roaming": any("roaming" in s for s in result["signals"]),
                     "agent_location": body.agent_location,
+                    "agent_id": body.agent_id,
+                    "agent_name": body.agent_name,
                     "checked_at": checked_at,
                 }).execute()
             except Exception as e:
@@ -148,6 +154,8 @@ async def check_number(
             signals=result["signals"],
             tool_calls_made=result["tool_calls_made"],
             checked_at=checked_at,
+            agent_id=body.agent_id,
+            agent_name=body.agent_name,
         )
 
     except Exception as e:
