@@ -18,6 +18,7 @@ This model is specifically optimised for function/tool calling.
 """
 
 import os
+import re
 import json
 import asyncio
 from typing import Optional
@@ -238,6 +239,7 @@ Use the available tools to check this number and give me a verdict."""
         # If no tool calls — agent has made its decision
         if not message.tool_calls or finish_reason == "stop":
             narration = message.content or "Check complete."
+            narration = re.sub(r'^(STOP|CAUTION|SAFE):\s*', '', narration).strip()
 
             # Extract verdict from narration
             verdict = "CAUTION"  # default
