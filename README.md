@@ -142,6 +142,4 @@ This project shares the same Supabase project as PAR-Map. Run `supabase_migratio
 
 ## Known constraints
 
-The simulator works for the prototype. Production deployment in Zambia requires MNO partnership. That's the real next step — not more features.
-
 False positives are real. A legitimate SIM replacement looks identical to a fraudulent one at the API level. The tool flags and warns. The agent always makes the final call. That's by design.
