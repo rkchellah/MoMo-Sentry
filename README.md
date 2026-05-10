@@ -6,7 +6,8 @@ Mobile money fraud in Zambia follows a pattern. Someone convinces a telecom agen
 
 ## What it does
 
-A booth agent opens the check screen, types in a customer's number, and hits check. MoMo Sentry calls Nokia's Network as Code CAMARA APIs in parallel:
+A booth agent opens the check screen, types in a customer's number, and hits check. MoMo Sentry calls Nokia's 
+Network as Code CAMARA APIs in parallel:
 
 - **SIM Swap API** — was this SIM swapped in the last 72 hours?
 - **Device Swap API** — did the SIM move to a new handset?
@@ -109,10 +110,17 @@ Backend runs on `http://localhost:8000`. The frontend lives in the PAR-Map repo 
 
 ## Nokia NaC simulator numbers
 
-| Number | Result |
+Nokia provides simulator numbers that return predictable responses. No real Zambian SIM needed to test this project.
+
+| Number | Expected result |
 |---|---|
-| +99999991000 | SIM swapped — STOP |
-| +99999991001 | Clean — SAFE |
+| +99999991000 | SAFE — no swap detected, device connected |
+| +99999991001 | SAFE — clean |
+| +99999990400 | STOP — SIM swap detected |
+| +99999990404 | STOP — SIM swap detected |
+| +99999990422 | CAUTION — device status anomaly |
+
+> Note: The Nokia NaC sandbox returns swapped: true for all valid numbers in the current simulator version. In production, real network data would return false for legitimate SIMs.
 
 ---
 
