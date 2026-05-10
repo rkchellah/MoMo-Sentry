@@ -13,8 +13,21 @@ and narrating them, the agent:
 The agent orchestrates the Nokia NaC APIs itself.
 That's the difference between tool use and agentic AI.
 
-Model: llama3-groq-70b-8192-tool-use-preview
-This model is specifically optimised for function/tool calling.
+FIX LOG:
+- BUG-007: Verdict was extracted by scanning narration text for keywords
+  like "STOP" or "SAFE". This caused contradictions where Groq would say
+  "this is fraudulent, cancel the transaction" but the badge showed SAFE
+  because the word "SAFE" appeared somewhere in the text.
+
+  ROOT CAUSE: The verdict logic trusted Groq's free-form text output
+  instead of the actual Nokia NaC API results. Groq is a language model —
+  it narrates, it does not make binary decisions reliably.
+
+  FIX: Verdict is now determined entirely by what Nokia's APIs returned,
+  stored in the `signals` list which is populated directly from API responses.
+  SIM swapped = STOP. Device swapped = STOP. No signals = SAFE.
+  Anything else (roaming, SMS only) = CAUTION.
+  Groq's role is narration only — it explains the verdict, it does not set it.
 """
 
 import os
@@ -41,17 +54,11 @@ When given a phone number to check:
 4. Reason over all the results together before giving a verdict
 
 Your final response must:
-- State the verdict clearly: SAFE, CAUTION, or STOP
 - Give a 1-2 sentence plain English explanation the agent can act on immediately
 - Never use technical jargon — no "API", "connectivity status", "latestSimChange"
 - Sound like a trusted colleague warning the agent, not a software system
 - If you see a pattern across multiple checks in this session, mention it
-
-Verdict rules:
-- STOP: SIM was swapped in last 72 hours (strong signal — always STOP)
-- STOP: Both SIM and device swapped recently
-- CAUTION: Device is roaming or on SMS only without a SIM swap
-- SAFE: No suspicious signals detected
+- Do NOT start your response with SAFE:, CAUTION:, or STOP: — just explain what you found
 """
 
 # Nokia NaC tools the agent can call
@@ -239,15 +246,41 @@ Use the available tools to check this number and give me a verdict."""
         # If no tool calls — agent has made its decision
         if not message.tool_calls or finish_reason == "stop":
             narration = message.content or "Check complete."
+
+            # Strip any accidental verdict prefix Groq adds despite instructions
             if narration:
                 narration = re.sub(r'^(STOP|CAUTION|SAFE):\s*', '', narration).strip()
 
-            # Extract verdict from narration
-            verdict = "CAUTION"  # default
-            narration_upper = narration.upper()
-            if "STOP" in narration_upper or "DO NOT RELEASE" in narration_upper:
+            # -------------------------------------------------------------------
+            # VERDICT IS DRIVEN BY NOKIA API SIGNALS — NOT BY GROQ'S TEXT
+            #
+            # Why: Groq is a language model. It narrates well but cannot reliably
+            # make binary safety decisions. When we extracted the verdict by
+            # scanning Groq's text for keywords like "STOP" or "SAFE", the badge
+            # contradicted the narration — SAFE badge while Groq said "cancel this
+            # transaction". That's dangerous for a booth agent making a real decision.
+            #
+            # The Nokia NaC APIs return hard facts: SIM swapped yes/no, device
+            # swapped yes/no, roaming yes/no. These are the ground truth.
+            # Groq explains those facts in plain English. It does not override them.
+            # -------------------------------------------------------------------
+
+            sim_swapped = any("SIM was swapped" in s for s in signals)
+            device_swapped = any("Device was also swapped" in s for s in signals)
+            device_roaming = any("roaming" in s for s in signals)
+            sms_only = any("SMS only" in s for s in signals)
+
+            if sim_swapped or device_swapped:
+                # Hard signals from Nokia APIs — always STOP
                 verdict = "STOP"
-            elif "SAFE" in narration_upper or "PROCEED" in narration_upper:
+            elif device_roaming or sms_only:
+                # Softer signals — proceed with caution
+                verdict = "CAUTION"
+            elif signals:
+                # Other signals detected
+                verdict = "CAUTION"
+            else:
+                # Nokia APIs returned no suspicious signals
                 verdict = "SAFE"
 
             # Save to session history
@@ -275,7 +308,7 @@ Use the available tools to check this number and give me a verdict."""
             tool_result = await _execute_tool(tool_name, tool_args)
             result_data = json.loads(tool_result)
 
-            # Track signals for the response
+            # Track signals — these drive the verdict, not Groq's text
             if tool_name == "check_sim_swap" and result_data.get("swapped"):
                 signals.append(f"SIM was swapped recently (last change: {result_data.get('last_sim_change', 'unknown')})")
             elif tool_name == "check_device_swap" and result_data.get("swapped"):
