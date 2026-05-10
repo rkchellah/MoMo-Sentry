@@ -1,45 +1,56 @@
 # MoMo Sentry
 
-I've worked at a mobile money booth in Lusaka. I know how the day goes — dozens of transactions, people you recognize by face, float you're personally responsible for. And I know the fraud that hits those booths hardest isn't some sophisticated cyber attack. It's SIM swap. Someone replaces the SIM in a customer's phone, walks to your booth three days later, and withdraws everything while you smile and hand over the cash.
-
-That's what this is built to stop.
+Mobile money fraud in Zambia follows a pattern. Someone convinces a telecom agent to replace a customer's SIM card. They wait a few days. Then they walk to a mobile money booth, give the agent a number, and ask to withdraw. The booth agent has no way to know the SIM was just swapped. They hand over the cash. By the time the real customer notices, it's gone.
 
 ---
 
 ## What it does
 
-A booth agent types in a customer's number. MoMo Sentry checks two things using Nokia's Network as Code CAMARA APIs:
+A booth agent opens the check screen, types in a customer's number, and hits check. MoMo Sentry calls Nokia's Network as Code CAMARA APIs in parallel:
 
-1. **Has this SIM been swapped recently?** — Nokia SIM Swap API
-2. **Is the device actually connected?** — Nokia Device Status API
+- **SIM Swap API** — was this SIM swapped in the last 72 hours?
+- **Device Swap API** — did the SIM move to a new handset?
+- **Device Status API** — is the device actually connected right now?
 
-Both checks run in parallel. Within 2-3 seconds, the agent gets back one of three things:
+The AI agent reasons over the results and responds in one or two plain sentences — not a score, not a badge alone, but something the agent can read and act on immediately.
 
-🟢 **SAFE** — No suspicious signals. Proceed.  
-🟡 **CAUTION** — Something is off. Ask the customer a question first.  
+🟢 **SAFE** — No signals. Proceed normally.  
+🟡 **CAUTION** — Something is off. Ask a question before releasing.  
 🔴 **STOP** — SIM was swapped recently. Do not release cash.
 
-The result isn't just a colour. The Groq AI agent explains it in plain language — "SIM was swapped 9 hours ago. Do not release cash until you confirm identity by another means." One sentence. The agent knows exactly what to do.
-
-Every check gets logged. Over time, the booth owner sees patterns on the fraud map — which areas, which hours, which numbers keep showing up flagged.
+Every check is logged. The booth owner sees all flags plotted on a Lusaka satellite map — one dot per agent, coloured by their most recent check verdict. Click an agent's dot to see their full check history. Click View Logs for the full table. That log is designed for booth owners, telcos, ZICTA, and law enforcement to identify repeat fraud numbers and act.
 
 ---
 
 ## Two screens, two users
 
-**`index.html` — the agent screen**  
-The booth agent uses this on their phone or laptop before releasing cash. Type a number, get a verdict in under 3 seconds.
+**`par-map.vercel.app/agent`** — the agent screen  
+The booth agent uses this before releasing cash. Sign in once, your location is pre-set. Type a number, get a verdict in under 3 seconds.
 
-**`map.html` — the owner screen**  
-The booth owner uses this to see what's happening across all their booths. Every flagged check appears as a coloured dot on a Lusaka map. Red dots are STOP verdicts. Yellow are CAUTION. Click any dot to see the narration and timestamp.
+**`par-map.vercel.app/sentry`** — the owner and analyst screen  
+The booth owner, telco analyst, or investigator uses this. Every registered agent appears as a dot at their permanent booth location. Click to see their check history. The pattern of who is getting hit, when, and with which numbers is visible at a glance.
 
 ---
 
 ## The moment it clicked
 
-I ran the first check against a simulated flagged number. The Nokia API came back — `swapped: true`. Groq narrated it back in one sentence that sounded exactly like what you'd want a trusted colleague to say before you hand over K5,000.
+I ran the first live check against a Nokia simulator number. The API came back — `swapped: true`. Groq narrated it in one sentence:
 
-That's when this stopped being a hackathon project and started feeling like something real.
+*"The SIM card for this number was swapped recently and the device has also changed, which is a strong indicator that someone is trying to commit fraud — do not release cash."*
+
+That's when this stopped feeling like a demo.
+
+---
+
+## How the agentic AI works
+
+The Groq agent doesn't just receive pre-computed results and narrate them. It decides which Nokia NaC tools to call, calls them, reasons over what comes back, and decides if it needs more information before giving a verdict.
+
+That's the difference between a lookup tool and an agent.
+
+The verdict itself is driven entirely by what Nokia's APIs returned — SIM swapped means STOP, no exceptions. Groq explains the decision in plain English. It does not make the safety call. The Nokia APIs do.
+
+The agent also holds session memory. If you check three numbers in a row and two come back flagged, it notices. It will say "this is the second suspicious number checked here today." That context is what a single API call can't give you.
 
 ---
 
@@ -47,120 +58,82 @@ That's when this stopped being a hackathon project and started feeling like some
 
 | Layer | Technology |
 |---|---|
-| CAMARA APIs | Nokia Network as Code (SIM Swap + Device Status) |
+| CAMARA APIs | Nokia Network as Code — SIM Swap, Device Swap, Device Status |
 | Backend | Python FastAPI |
 | AI Agent | Groq (llama-3.3-70b) with persistent session memory |
-| Database | Supabase (PostgreSQL + RLS) — shared with PAR-Map project |
-| Map | Mapbox + Leaflet |
-| Frontend | Vanilla HTML/JS — no framework |
-| Deployment | Vercel (frontend) + Railway (backend) |
+| Database | Supabase (PostgreSQL) — shared with PAR-Map |
+| Map | Mapbox + Leaflet via PAR-Map |
+| Deployment | Railway (backend) + Vercel (frontend via PAR-Map) |
 
 ---
 
 ## Architecture
 
 ```
-Agent types number
+Agent types a number
        ↓
-POST /check  {phone_number, agent_location}
+POST /check  {phone_number, agent_location, agent_id}
        ↓
-Nokia NaC: SIM Swap + Device Status  ← run in parallel
+Groq agent decides which Nokia NaC tools to call
        ↓
-Risk scorer: signals → Safe/Caution/Stop
+Calls SIM Swap + Device Swap + Device Status in parallel
        ↓
-Groq agent: narrates in plain English
-(remembers previous checks in this session)
+Reasons over all three results
        ↓
-Response: verdict + narration + signals
+Returns: STOP/CAUTION/SAFE + plain English narration
        ↓
-Logged to Supabase → fraud map updates
+Logged to Supabase fraud_checks
+       ↓
+Map updates — agent's dot reflects latest verdict
 ```
-
-The Groq agent holds session memory. If you check three numbers in a row and two of them are flagged from Kanyama, the agent notices. It'll say "this is the second suspicious number from that area today." That's the difference between a lookup tool and something that actually thinks.
-
----
-
-## How the map works
-
-The map is the booth owner's view. It pulls flagged checks from Supabase and plots them on Lusaka by neighbourhood.
-
-When an agent runs a check, they select their location from a dropdown — Kanyama, Matero, Chilenje, and so on. That neighbourhood name gets saved with the check. The map converts it to coordinates using a fixed lookup table and drops a dot there.
-
-Over a day of real use, patterns emerge. A cluster of STOP flags in one area at the same time of day isn't random — that's someone working a neighbourhood. That's the intelligence that a single API call can't give you, but a map of accumulated checks can.
-
-The map reuses the same Supabase project and Mapbox setup from PAR-Map — a loan portfolio geospatial tool I built for SupaMoto Zambia. The data model is different but the rendering pattern is identical. I didn't rebuild infrastructure that already worked.
 
 ---
 
 ## Running locally
 
 ```bash
-# Backend
 cd backend
 python -m venv env
 source env/bin/activate       # Windows: env\Scripts\activate
 pip install -r requirements.txt
 
 cp .env.example .env
-# Fill in your Nokia NaC API key, Groq key, and Supabase credentials
+# Fill in Nokia NaC API key, Groq key, Supabase credentials
 
 uvicorn main:app --reload
 ```
 
-```bash
-# Frontend
-# Open frontend/index.html directly in your browser
-# Or serve both files:
-cd frontend
-python -m http.server 3000
-```
-
-The backend runs on `http://localhost:8000`. Both frontend files point there by default.
+Backend runs on `http://localhost:8000`. The frontend lives in the PAR-Map repo at `par-map.vercel.app/agent` and `par-map.vercel.app/sentry`.
 
 ---
 
-## Testing with simulator numbers
+## Nokia NaC simulator numbers
 
-Nokia provides simulator numbers that return predictable responses. No real Zambian SIM needed.
-
-| Number | Expected result |
+| Number | Result |
 |---|---|
-| +99999991000 | SAFE — no swap detected, device connected |
-| +99999991001 | SAFE — clean |
-| +99999990400 | STOP — SIM swap detected |
-| +99999990404 | STOP — SIM swap detected |
-| +99999990422 | CAUTION — device status anomaly |
-
-Use these during the demo. Type `+99999990400`, watch it come back STOP, read what Groq says.
+| +99999991000 | SIM swapped — STOP |
+| +99999991001 | Clean — SAFE |
 
 ---
 
-## Database setup
+## Database
 
-This project reuses the same Supabase project as PAR-Map to keep the infrastructure simple — one project, one connection string, one place to look. Run `supabase_migration.sql` in your Supabase SQL editor to add the `fraud_checks` table. It won't touch any existing PAR-Map tables.
+This project shares the same Supabase project as PAR-Map. Run `supabase_migration.sql` in your SQL editor to create the `fraud_checks` and `booth_agents` tables. Existing PAR-Map tables are not touched.
 
 ---
 
-## What I didn't build (and why)
+## What isn't in the prototype
 
-**Number Verification** is in the Nokia NaC stack and documented in the codebase. I didn't wire it into the live demo because it requires the customer to click an OAuth link on their own phone over mobile data. At a booth that's a realistic flow for high-value transactions — but it adds friction that doesn't belong in a prototype demo. The production path for it is documented in `camara.py`.
+**Number Verification** is documented in `camara.py`. It requires the customer to click an OAuth link on their own phone — a real flow for high-value transactions, but friction that doesn't belong in a prototype demo.
 
-**SMS alerts** were dropped. The Groq narration in the UI is the alert. Africa's Talking integration is a single function call in production — the decision not to include it was about keeping the prototype focused, not about capability.
+**SMS alerts** were dropped. The Groq narration in the UI is the alert. Africa's Talking integration is one function call in production.
+
+**USSD interface** is the right long-term tool for booth agents who don't have smartphones. It requires MNO partnership — MTN Zambia or Airtel Zambia would need to be onboarded to the Nokia NaC platform. That's a business conversation, not a technical one.
 
 ---
 
 ## Known constraints
 
-The simulator works perfectly for the prototype. Real production deployment in Zambia requires MNO partnership — MTN Zambia and Airtel Zambia would need to be onboarded to the Nokia NaC platform. That's a business and regulatory conversation, not a technical one.
+The simulator works for the prototype. Production deployment in Zambia requires MNO partnership. That's the real next step — not more features.
 
-Latency matters. On a slow 3G connection at a booth, the check needs to come back in under 3 seconds or agents won't use it. Running SIM Swap and Device Status in parallel keeps total latency low. The per-call timeout is set at 10 seconds as a hard ceiling.
-
-False positives are real. A legitimate SIM replacement — lost phone, upgrade — looks identical to a fraudulent swap at the API level. The tool flags and warns. The agent always makes the final call.
-
----
-
-## Author
-
-Chella Kamina — data analyst, former mobile money booth worker, Lusaka, Zambia.
-
-Built for the Africa Ignite Hackathon 2026. Theme 1: Financial Inclusion, Secure Payments & Anti-Fraud.
+False positives are real. A legitimate SIM replacement looks identical to a fraudulent one at the API level. The tool flags and warns. The agent always makes the final call. That's by design.
