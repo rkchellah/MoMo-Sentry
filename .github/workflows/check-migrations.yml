@@ -1,0 +1,24 @@
+name: check-migrations
+
+# The shared-Supabase rule in ARCHITECTURE.md - never migrate PAR-Map tables -
+# is only as strong as the thing that enforces it. This is that thing.
+
+on:
+  push:
+    paths:
+      - 'supabase/**'
+      - 'scripts/check_migrations.py'
+  pull_request:
+    paths:
+      - 'supabase/**'
+      - 'scripts/check_migrations.py'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/check_migrations.py

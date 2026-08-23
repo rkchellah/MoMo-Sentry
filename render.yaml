@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: momo-sentry
+    runtime: python
+    plan: starter
+    region: frankfurt
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    buildFilter:
+      paths:
+        - backend/**
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: NAC_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_MODEL
+        value: deepseek-chat
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: NAC_MODE
+        value: sandbox
+      - key: REQUIRE_AUTH
+        value: "true"

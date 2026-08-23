@@ -5,9 +5,10 @@ Takes SIM Swap, Device Swap, and Device Status signals
 and returns a verdict.
 
 Verdict levels:
-  SAFE    — no suspicious signals, proceed with transaction
-  CAUTION — something is off, agent should ask questions
-  STOP    — high fraud risk, do not release cash
+  SAFE         — no suspicious signals in the lookback window
+  CAUTION      — something is off, agent should ask questions
+  STOP         — high fraud risk, do not release cash
+  CHECK_FAILED — Nokia call failed; must not be treated as SAFE
 
 Weights are transparent and explainable. No black box.
 """
@@ -18,10 +19,10 @@ from camara import SimSwapResult, DeviceSwapResult, DeviceStatusResult
 
 @dataclass
 class RiskVerdict:
-    verdict: str        # SAFE | CAUTION | STOP
+    verdict: str        # SAFE | CAUTION | STOP | CHECK_FAILED
     score: float        # 0.0 to 1.0, higher = more risky
     signals: list[str]  # what triggered this verdict
-    reason: str         # one plain sentence for the Groq agent to build on
+    reason: str         # one plain sentence for the agent to build on
 
 
 def score(
@@ -80,7 +81,14 @@ def score(
     risk_score = min(risk_score, 1.0)
 
     # --- Verdict ---
-    if risk_score >= 0.60:
+    # SIM swap is the control. If that API failed, we do not know enough to pay out.
+    if sim.error:
+        verdict = "CHECK_FAILED"
+    elif sim.swapped or device_swap.swapped:
+        verdict = "STOP"
+    elif device_swap.error or device.error:
+        verdict = "CAUTION"
+    elif risk_score >= 0.60:
         verdict = "STOP"
     elif risk_score >= 0.25:
         verdict = "CAUTION"
@@ -104,8 +112,14 @@ def _build_reason(
     device_swap: DeviceSwapResult,
 ) -> str:
     """
-    Build a plain sentence summary for the Groq agent to narrate from.
+    Build a plain sentence summary for the agent to narrate from.
     """
+    if verdict == "CHECK_FAILED":
+        return (
+            "The SIM swap check did not complete. Do not treat this as safe. "
+            "Try again, or refuse the payout if the customer cannot wait."
+        )
+
     if verdict == "STOP":
         if sim.swapped and device_swap.swapped:
             return (
@@ -117,9 +131,10 @@ def _build_reason(
         return f"Multiple risk signals detected: {'; '.join(signals)}."
 
     if verdict == "CAUTION":
+        first = signals[0].lower() if signals else "a network signal could not be confirmed"
         return (
-            f"One risk signal detected — {signals[0].lower()} — "
+            f"One risk signal detected — {first} — "
             "ask the customer a verification question before proceeding."
         )
 
-    return "No suspicious signals. SIM and device are stable."
+    return "No swap in the last 72 hours on this simulator number. That is not proof the customer is legitimate."

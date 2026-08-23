@@ -1,7 +1,8 @@
--- MoMo Sentry — fraud_checks table
--- Run this in your Supabase SQL editor
+-- MoMo Sentry — 001: fraud_checks table
+-- Run first in the Supabase SQL editor, then 002, then 003.
+-- If this table already exists, skip this file.
 
-create table fraud_checks (
+create table if not exists fraud_checks (
   id                  uuid primary key default gen_random_uuid(),
   phone_number        text not null,
   verdict             text not null check (verdict in ('SAFE', 'CAUTION', 'STOP')),
@@ -16,12 +17,12 @@ create table fraud_checks (
   checked_at          timestamptz default now()
 );
 
--- Index for the map query (recent flags by location)
-create index on fraud_checks (verdict, checked_at desc);
+create index if not exists fraud_checks_verdict_checked_at_idx
+  on fraud_checks (verdict, checked_at desc);
 
--- RLS: readable by authenticated users, writable by service role only
 alter table fraud_checks enable row level security;
 
+drop policy if exists "Authenticated users can read checks" on fraud_checks;
 create policy "Authenticated users can read checks"
   on fraud_checks for select
   using (auth.role() = 'authenticated');
