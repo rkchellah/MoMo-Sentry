@@ -37,6 +37,23 @@ def _auth_required() -> bool:
     return os.environ.get("REQUIRE_AUTH", "true").lower() in ("1", "true", "yes")
 
 
+def _env_present(key: str) -> bool:
+    value = (os.environ.get(key) or "").strip()
+    if not value:
+        return False
+    return not value.startswith("your_")
+
+
+def _missing_env() -> list[str]:
+    required = [
+        "NAC_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_KEY",
+    ]
+    return [key for key in required if not _env_present(key)]
+
+
 app = FastAPI(
     title="MoMo Sentry",
     description="SIM swap fraud checks for mobile money booth agents",
@@ -83,14 +100,26 @@ def get_current_user(
     return resolve_user(authorization, required=_auth_required())
 
 
+@app.get("/")
+async def root():
+    return {
+        "service": "MoMo Sentry API",
+        "health": "/health",
+        "docs": "/docs",
+        "check": "POST /check",
+    }
+
+
 @app.get("/health")
 async def health():
+    missing = _missing_env()
     return {
-        "status": "ok",
+        "status": "ok" if not missing else "degraded",
         "supabase": supabase_enabled(),
         "version": "3.0.0",
         "mode": nac_mode(),
         "auth_required": _auth_required(),
+        "missing_env": missing,
     }
 
 

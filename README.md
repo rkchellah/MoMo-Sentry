@@ -65,7 +65,7 @@ The agent also holds session memory. If you check three numbers in a row and two
 | AI Agent | DeepSeek (`deepseek-chat`) with persistent session memory |
 | Database | Supabase (PostgreSQL) — shared with PAR-Map |
 | Map | Mapbox + Leaflet via PAR-Map |
-| Deployment | Render (backend) + Vercel (frontend via PAR-Map) |
+| Deployment | Render — API at `momo-sentry.onrender.com`, Next.js as a second Web Service |
 
 ---
 
@@ -111,35 +111,56 @@ Backend runs on `http://localhost:8000`. The frontend lives in the PAR-Map repo 
 
 ---
 
-## Deploy the backend on Render
+## Deploy on Render
 
-The FastAPI API is a Render Web Service. The repo already includes a Blueprint at `render.yaml`.
+Two Web Services. The API is `https://momo-sentry.onrender.com`. Confirm it with `GET /health` — `"supabase": true` means the service-role key is set. `"supabase": false` means login and checks will 503 until you add `SUPABASE_URL` and `SUPABASE_SERVICE_KEY`.
 
-1. Open [Render Blueprints](https://dashboard.render.com/blueprints) and connect `rkchellah/MoMo-Sentry`.
-2. When prompted, paste the same keys from `backend/.env.example`:
-   - `NAC_API_KEY`
-   - `DEEPSEEK_API_KEY`
-   - `SUPABASE_URL`
-   - `SUPABASE_SERVICE_KEY`
-   - `FRONTEND_ORIGIN` (your Vercel origin, comma-separated if you also use localhost)
-3. Set `NAC_MODE=sandbox` and `REQUIRE_AUTH=true`.
-4. Deploy. The API URL will look like `https://momo-sentry.onrender.com`.
-5. Point the frontend at it:
+### API (`backend/`)
+
+Already created as **MoMo-Sentry**. Environment → add every key from `backend/.env` (not `.env.local`):
 
 ```
+NAC_API_KEY
+NAC_MODE=sandbox
+DEEPSEEK_API_KEY
+DEEPSEEK_MODEL=deepseek-chat
+SUPABASE_URL
+SUPABASE_SERVICE_KEY
+FRONTEND_ORIGIN=http://localhost:3000
+REQUIRE_AUTH=true
+PYTHON_VERSION=3.12.8
+```
+
+After the frontend is live, set `FRONTEND_ORIGIN` to `https://<frontend>.onrender.com,http://localhost:3000` (no trailing slash) and Manual Deploy the API.
+
+Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`. Health check path: `/health`.
+
+### Frontend (`frontend/`)
+
+New Web Service, same repo:
+
+| Field | Value |
+|---|---|
+| Root Directory | `frontend` |
+| Runtime | Node |
+| Build | `npm install && npm run build` |
+| Start | `npm start` |
+
+```
+NODE_VERSION=20
 NEXT_PUBLIC_MOMO_SENTRY_API=https://momo-sentry.onrender.com
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_MAPBOX_TOKEN=
 ```
 
-Run `supabase/migrations/002_production_auth.sql` in the Supabase SQL editor, then seed an owner:
+Copy the last three from `frontend/.env.local`. `NEXT_PUBLIC_*` is baked in at build time — set them before the first build.
 
-```
-insert into momo_profiles (user_id, role)
-values ('<auth user uuid>', 'owner');
-```
+In Supabase → Authentication → URL Configuration, set Site URL to the frontend Render origin and add it under Redirect URLs.
 
-Confirm it is up with `GET /health`.
+Then open `/sentry`, create the first owner account (or insert into `momo_profiles`). Run `supabase/migrations/002_production_auth.sql` first if that table is missing.
 
-A paid Render instance stays awake. Free web services sleep after 15 minutes idle.
+A paid instance stays awake. Free web services sleep after 15 minutes idle.
 
 ---
 

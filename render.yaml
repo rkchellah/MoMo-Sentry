@@ -3,7 +3,7 @@ services:
     name: momo-sentry
     runtime: python
     plan: starter
-    region: frankfurt
+    region: oregon
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
@@ -30,3 +30,26 @@ services:
         value: sandbox
       - key: REQUIRE_AUTH
         value: "true"
+
+  - type: web
+    name: momo-sentry-web
+    runtime: node
+    plan: starter
+    region: oregon
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    buildFilter:
+      paths:
+        - frontend/**
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NEXT_PUBLIC_MOMO_SENTRY_API
+        value: https://momo-sentry.onrender.com
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: NEXT_PUBLIC_MAPBOX_TOKEN
+        sync: false
