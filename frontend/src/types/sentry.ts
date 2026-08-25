@@ -107,6 +107,6 @@ export function formatCheckTime(iso: string): string {
 }
 
 export function displayAgentName(name?: string | null): string {
-    if (!name || name === 'Owner' || name === 'Owner check') return 'Lintel Zambia owner'
+    if (!name || name === 'Owner' || name === 'Owner check') return 'Owner'
     return name
 }

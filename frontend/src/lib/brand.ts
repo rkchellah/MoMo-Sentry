@@ -1,6 +1,5 @@
 import { BoothLocation } from '../types/sentry'
 
-export const TELCO_NAME = 'Lintel Zambia'
 export const PRODUCT_NAME = 'MoMo Sentry'
 
 /** Lusaka booths used when booth_locations is empty or blocked by RLS. */

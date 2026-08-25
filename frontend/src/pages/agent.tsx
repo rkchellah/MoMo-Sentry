@@ -6,9 +6,8 @@ import { BrandLockup, IconArrow } from '../components/icons'
 import { Select } from '../components/Select'
 import { getBoothLocations } from '../lib/fraudService'
 import { BoothLocation, Verdict } from '../types/sentry'
-import { SandboxBanner } from '../components/SandboxBanner'
 import { ThemeToggle } from '../components/ThemeToggle'
-import { AuthShell, AuthError, PasswordField } from '../components/AuthShell'
+import { AuthShell, AuthError, PasswordField, AuthField, AuthActions } from '../components/AuthShell'
 import { SANDBOX_CUSTOMERS, postCheck } from '../lib/sentryApi'
 import { VerdictPill, verdictLabel } from '../components/VerdictPill'
 
@@ -19,7 +18,16 @@ interface BoothAgent {
   primary_location: string
 }
 
-/** Chip tone follows the verdict the sandbox number is meant to produce. */
+/** Short chip labels so the till reads as a control, not a form. */
+function chipShort(label: string): string {
+  if (label.startsWith('SAFE (alt)')) return 'Safe 2'
+  if (label.startsWith('SAFE')) return 'Safe'
+  if (label.includes('(alt)')) return 'Stop 2'
+  if (label.startsWith('STOP')) return 'Stop'
+  if (label.startsWith('CAUTION')) return 'Caution'
+  return label
+}
+
 function chipTone(label: string): string {
   if (label.startsWith('STOP')) return ' chip-stop'
   if (label.startsWith('CAUTION')) return ' chip-caution'
@@ -64,7 +72,7 @@ export default function AgentPage() {
     return () => { clearTimeout(timeout); subscription.unsubscribe() }
   }, [])
 
-  async function loadAgent(userId: string) {
+  async function loadAgent(userId: string): Promise<boolean> {
     const { data } = await supabase
       .from('booth_agents')
       .select('id, name, phone, primary_location')
@@ -73,7 +81,9 @@ export default function AgentPage() {
     if (data) {
       setAgent(data)
       setCheckLocation(data.primary_location)
+      return true
     }
+    return false
   }
 
   async function handleLogin(e: React.FormEvent) {
@@ -86,7 +96,13 @@ export default function AgentPage() {
       setLoginLoading(false)
       return
     }
-    if (data.session) await loadAgent(data.session.user.id)
+    if (data.session) {
+      const ok = await loadAgent(data.session.user.id)
+      if (!ok) {
+        await supabase.auth.signOut()
+        setLoginError('This account has no booth till. Register, or open operations.')
+      }
+    }
     setLoginLoading(false)
   }
 
@@ -122,42 +138,35 @@ export default function AgentPage() {
 
   if (!agent) {
     return (
-      <AuthShell
-        title="Agent sign in — Lintel Zambia"
-        asideTitle="Check a number before you pay out."
-      >
-        <BrandLockup />
-        <h1>Agent sign in</h1>
-        <p className="lede">Booth till for Lintel Zambia. Use a simulator number, or type +999…</p>
+      <AuthShell title="Log in — MoMo Sentry" heading="Log in to MoMo Sentry">
         {loginError && <AuthError>{loginError}</AuthError>}
         <form onSubmit={handleLogin}>
-          <label className="field-label">Email</label>
-          <input className="field-input" type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} autoComplete="email" placeholder="you@lintel.zm" required />
-          <label className="field-label" style={{ marginTop: 14 }}>Password</label>
-          <PasswordField value={loginPassword} onChange={setLoginPassword} show={showPwd} onToggle={() => setShowPwd(v => !v)} autoComplete="current-password" />
-          <button className="btn" type="submit" disabled={loginLoading} style={{ marginTop: 22, width: '100%' }}>
-            {loginLoading ? <><span className="spinner spinner-inline" /> Signing in…</> : <>Sign in <IconArrow /></>}
-          </button>
+          <AuthField label="Email">
+            <input className="auth-input" type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} autoComplete="email" required autoFocus />
+          </AuthField>
+          <AuthField label="Password">
+            <PasswordField value={loginPassword} onChange={setLoginPassword} show={showPwd} onToggle={() => setShowPwd(v => !v)} autoComplete="current-password" />
+          </AuthField>
+          <AuthActions
+            busy={loginLoading}
+            label="Log in"
+            aside={<Link href="/agent-register">Don&rsquo;t have an account?</Link>}
+          />
         </form>
-        <p className="auth-foot">No account? <Link href="/agent-register">Register</Link> · <Link href="/sentry">Owner</Link></p>
       </AuthShell>
     )
   }
 
   return (
     <>
-      <Head><title>Booth check — Lintel Zambia</title></Head>
+      <Head><title>Booth check — MoMo Sentry</title></Head>
       <div className="app-shell">
-        <SandboxBanner />
         <div className="page" style={{ display: 'flex', justifyContent: 'center' }}>
           <div className="till">
             <div className="till-top">
-              <div>
-                <BrandLockup />
-                <h1 style={{ fontSize: 21, fontWeight: 620, letterSpacing: '-0.03em', margin: '18px 0 4px' }}>{agent.name}</h1>
-                <p className="hint" style={{ margin: 0 }}>{agent.primary_location}</p>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <BrandLockup />
+              <div className="till-tools">
+                <span className="till-badge"><span className="dot-live" /> Sandbox</span>
                 <ThemeToggle />
                 <button
                   className="btn btn-ghost btn-sm"
@@ -168,35 +177,46 @@ export default function AgentPage() {
                 </button>
               </div>
             </div>
+            <h1 className="till-name">{agent.name}</h1>
+            <p className="till-place">{agent.primary_location}</p>
 
             <div className="till-card">
-              <div className="till-kicker">Number check</div>
               <form onSubmit={handleCheck}>
-                <label className="field-label">Customer number</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                <label className="till-phone-label" htmlFor="customer-number">Number</label>
+                <input
+                  id="customer-number"
+                  className="till-phone"
+                  type="tel"
+                  value={checkPhone}
+                  onChange={e => setCheckPhone(e.target.value)}
+                  placeholder="+99999991000"
+                  required
+                />
+                <div className="till-seg">
                   {SANDBOX_CUSTOMERS.map(c => (
                     <button
                       key={c.phone}
                       type="button"
                       className={`chip${chipTone(c.label)}${checkPhone === c.phone ? ' is-on' : ''}`}
                       onClick={() => setCheckPhone(c.phone)}
-                      title={c.hint}
+                      title={c.label}
                     >
-                      {c.label}
+                      {chipShort(c.label)}
                     </button>
                   ))}
                 </div>
-                <input className="field-input mono" type="tel" value={checkPhone} onChange={e => setCheckPhone(e.target.value)} placeholder="+99999991000" required />
-                <p className="hint">SAFE means no swap in the last 72 hours on this simulator — not that the person is legitimate.</p>
-                <label className="field-label" style={{ marginTop: 16 }}>Booth</label>
-                <Select
-                  aria-label="Booth"
-                  value={checkLocation}
-                  onChange={setCheckLocation}
-                  options={boothLocations.map(l => ({ value: l.name, label: l.name }))}
-                  placeholder="Select booth"
-                />
-                <button className="btn" type="submit" disabled={checking} style={{ marginTop: 20, width: '100%', height: 46 }}>
+                <p className="hint till-hint">Simulator only. SAFE is no swap in 72 hours — not that the person is legitimate.</p>
+                <div className="till-booth">
+                  <label className="field-label">Booth</label>
+                  <Select
+                    aria-label="Booth"
+                    value={checkLocation}
+                    onChange={setCheckLocation}
+                    options={boothLocations.map(l => ({ value: l.name, label: l.name }))}
+                    placeholder="Select booth"
+                  />
+                </div>
+                <button className="btn till-go" type="submit" disabled={checking}>
                   {checking
                     ? <><span className="spinner spinner-inline" /> Asking the network…</>
                     : <>Check number <IconArrow /></>}

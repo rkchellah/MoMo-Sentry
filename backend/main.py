@@ -158,7 +158,7 @@ async def check_number(
     agent_id = user.agent_id if user and user.role == "agent" else None
     agent_name = user.agent_name if user else None
     if user and user.role == "owner":
-        agent_name = agent_name or "Lintel Zambia owner"
+        agent_name = agent_name or "Owner"
 
     if reject or not normalized:
         result = {

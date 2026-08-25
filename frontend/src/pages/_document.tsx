@@ -10,11 +10,11 @@ export default function Document() {
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Inter:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
           rel="stylesheet"
         />
-        <meta name="theme-color" content="#f4f4f4" media="(prefers-color-scheme: light)" />
-        <meta name="theme-color" content="#0d0d0d" media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content="#f6f6f4" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
       </Head>
       <body>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />

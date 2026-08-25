@@ -1,48 +1,51 @@
 import Head from 'next/head'
 import { ReactNode } from 'react'
-import { BrandLockup, IconAlert, IconEye, IconEyeOff } from './icons'
-import { SandboxBanner } from './SandboxBanner'
-import { ThemeToggle } from './ThemeToggle'
+import { IconAlert, IconEnter, IconEye, IconEyeOff } from './icons'
 
 export function AuthShell({
   title,
-  asideTitle,
-  asideBody,
+  heading,
   children,
 }: {
   title: string
-  asideTitle?: string
-  asideBody?: string
+  heading: string
   children: ReactNode
 }) {
   return (
     <>
       <Head><title>{title}</title></Head>
       <div className="auth-page">
-        <SandboxBanner />
-        <div className="auth-body">
-          <aside className="auth-aside">
-            <div>
-              <BrandLockup invert />
-              <h2>{asideTitle ?? 'SIM-swap checks for Lintel Zambia booths.'}</h2>
-              <p>{asideBody ?? 'Verdicts come from the Nokia network API. The written narration explains a verdict, it never sets one.'}</p>
-            </div>
-            <p className="aside-foot">
-              <span className="dot-live" />
-              Sandbox · +999 simulator numbers
-            </p>
-          </aside>
-          <div className="auth-main">
-            <div className="auth-card">
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: -12 }}>
-                <ThemeToggle />
-              </div>
-              {children}
-            </div>
-          </div>
+        <div className="auth-center">
+          <h1>{heading}</h1>
+          {children}
         </div>
       </div>
     </>
+  )
+}
+
+export function AuthField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="auth-row">
+      <span className="auth-row-label">{label}</span>
+      {children}
+    </div>
+  )
+}
+
+export function AuthActions({ aside, busy, label }: {
+  aside: ReactNode
+  busy?: boolean
+  label: string
+}) {
+  return (
+    <div className="auth-actions">
+      <div className="auth-aside-link">{aside}</div>
+      <button className="auth-continue" type="submit" disabled={busy}>
+        {busy ? '…' : label}
+        {!busy && <IconEnter />}
+      </button>
+    </div>
   )
 }
 
@@ -65,13 +68,11 @@ export function PasswordField(props: {
   return (
     <div className="pwd-wrap">
       <input
-        className="field-input"
+        className="auth-input"
         type={props.show ? 'text' : 'password'}
         value={props.value}
         onChange={e => props.onChange(e.target.value)}
-        placeholder="••••••••"
         autoComplete={props.autoComplete}
-        style={{ paddingRight: 46 }}
         required
       />
       <button

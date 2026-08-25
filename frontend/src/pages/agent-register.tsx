@@ -2,11 +2,10 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import { supabase } from '../lib/supabase'
-import { BrandLockup, IconArrow } from '../components/icons'
 import { Select } from '../components/Select'
 import { getBoothLocations } from '../lib/fraudService'
 import { BoothLocation } from '../types/sentry'
-import { AuthShell, AuthError, PasswordField } from '../components/AuthShell'
+import { AuthShell, AuthError, PasswordField, AuthField, AuthActions } from '../components/AuthShell'
 
 export default function AgentRegisterPage() {
   const router = useRouter()
@@ -50,39 +49,36 @@ export default function AgentRegisterPage() {
   }
 
   return (
-    <AuthShell
-      title="Register agent — Lintel Zambia"
-      asideTitle="Register a booth agent."
-      asideBody="Register against a Lintel Zambia site. The owner sees your checks in the queue."
-    >
-      <BrandLockup />
-      <h1>Register as an agent</h1>
-      <p className="lede">Your account can only write agent checks. Owners are not created here.</p>
+    <AuthShell title="Create account — MoMo Sentry" heading="Create a MoMo Sentry account">
       {error && <AuthError>{error}</AuthError>}
       <form onSubmit={handleSubmit}>
-        <label className="field-label">Full name</label>
-        <input className="field-input" value={name} onChange={e => setName(e.target.value)} autoComplete="name" placeholder="Chanda Mwale" required />
-        <label className="field-label" style={{ marginTop: 14 }}>Email</label>
-        <input className="field-input" type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" placeholder="you@lintel.zm" required />
-        <label className="field-label" style={{ marginTop: 14 }}>Password</label>
-        <PasswordField value={password} onChange={setPassword} show={showPwd} onToggle={() => setShowPwd(v => !v)} autoComplete="new-password" />
-        <label className="field-label" style={{ marginTop: 14 }}>Phone</label>
-        <input className="field-input mono" type="tel" value={phone} onChange={e => setPhone(e.target.value)} autoComplete="tel" placeholder="+2609…" required />
-        <label className="field-label" style={{ marginTop: 14 }}>Primary booth</label>
-        <Select
-          aria-label="Primary booth"
-          value={location}
-          onChange={setLocation}
-          options={boothLocations.map(l => ({ value: l.name, label: l.name }))}
-          placeholder="Select booth"
+        <AuthField label="Name">
+          <input className="auth-input" value={name} onChange={e => setName(e.target.value)} autoComplete="name" required />
+        </AuthField>
+        <AuthField label="Email">
+          <input className="auth-input" type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required />
+        </AuthField>
+        <AuthField label="Password">
+          <PasswordField value={password} onChange={setPassword} show={showPwd} onToggle={() => setShowPwd(v => !v)} autoComplete="new-password" />
+        </AuthField>
+        <AuthField label="Phone">
+          <input className="auth-input" type="tel" value={phone} onChange={e => setPhone(e.target.value)} autoComplete="tel" required />
+        </AuthField>
+        <AuthField label="Booth">
+          <Select
+            aria-label="Primary booth"
+            value={location}
+            onChange={setLocation}
+            options={boothLocations.map(l => ({ value: l.name, label: l.name }))}
+            placeholder="Select booth"
+          />
+        </AuthField>
+        <AuthActions
+          busy={loading}
+          label="Continue"
+          aside={<Link href="/agent">Already have an account?</Link>}
         />
-        <button className="btn" type="submit" disabled={loading} style={{ marginTop: 22, width: '100%' }}>
-          {loading
-            ? <><span className="spinner spinner-inline" /> Creating…</>
-            : <>Create agent account <IconArrow /></>}
-        </button>
       </form>
-      <p className="auth-foot">Already registered? <Link href="/agent">Sign in</Link></p>
     </AuthShell>
   )
 }

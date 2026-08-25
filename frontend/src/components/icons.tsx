@@ -108,11 +108,21 @@ export function IconRefresh({ size = 14, color = 'currentColor' }: IconProps) {
   )
 }
 
+export function IconEnter({ size = 14, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect x="1.4" y="1.4" width="13.2" height="13.2" rx="2.4" stroke={color} strokeWidth="1.25" />
+      <path d="M10.2 5.2v3.2H5.6" stroke={color} strokeWidth="1.25" strokeLinecap="round" />
+      <path d="M7.1 6.7 5.5 8.4l1.6 1.7" stroke={color} strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export function BrandLockup({ invert = false }: { invert?: boolean }) {
   return (
     <div className="brand">
       <div className="brand-copy">
-        <div className={`brand-kicker${invert ? ' is-invert' : ''}`}>Lintel Zambia</div>
+        <div className={`brand-kicker${invert ? ' is-invert' : ''}`}>Fraud checks</div>
         <div className="brand-name">MoMo Sentry</div>
       </div>
     </div>

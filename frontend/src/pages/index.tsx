@@ -7,7 +7,7 @@ import { ThemeToggle } from '../components/ThemeToggle'
 export default function Home() {
   return (
     <>
-      <Head><title>Lintel Zambia — MoMo Sentry</title></Head>
+      <Head><title>MoMo Sentry</title></Head>
       <div className="gate">
         <SandboxBanner />
         <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '14px 28px 0' }}>

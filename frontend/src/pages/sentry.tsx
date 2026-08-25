@@ -10,7 +10,7 @@ import { getFraudChecks, getBoothLocations } from '../lib/fraudService'
 import { supabase } from '../lib/supabase'
 import { SandboxBanner } from '../components/SandboxBanner'
 import { ThemeToggle } from '../components/ThemeToggle'
-import { AuthShell, AuthError, PasswordField } from '../components/AuthShell'
+import { AuthShell, AuthError, PasswordField, AuthField, AuthActions } from '../components/AuthShell'
 import { VerdictPill } from '../components/VerdictPill'
 import { Select } from '../components/Select'
 import { WhereView } from '../components/WhereView'
@@ -265,50 +265,47 @@ export default function SentryPage() {
     const creating = authMode === 'create'
     return (
       <AuthShell
-        title={creating ? 'Create owner — Lintel Zambia' : 'Owner sign in — Lintel Zambia'}
-        asideTitle="Owner operations for Lintel Zambia."
-        asideBody="Queue lists every check from every booth. Where puts the same rows on a map of Lusaka."
+        title={creating ? 'Create account — MoMo Sentry' : 'Log in — MoMo Sentry'}
+        heading={creating ? 'Create a MoMo Sentry account' : 'Log in to MoMo Sentry'}
       >
-        <BrandLockup />
-        <h1>{creating ? 'Create the first owner' : 'Owner sign in'}</h1>
-        <p className="lede">
-          {creating
-            ? 'No owner exists yet. This login becomes the operations account.'
-            : 'Operations for Lintel Zambia booth checks.'}
-        </p>
         {loginError && <AuthError>{loginError}</AuthError>}
         <form onSubmit={creating ? handleCreateOwner : handleLogin}>
-          <label className="field-label">Email</label>
-          <input className="field-input" type="email" required value={loginEmail} onChange={e => setLoginEmail(e.target.value)} autoComplete="email" placeholder="owner@lintel.zm" />
-          <label className="field-label" style={{ marginTop: 14 }}>Password</label>
-          <PasswordField
-            value={loginPassword}
-            onChange={setLoginPassword}
-            show={showPwd}
-            onToggle={() => setShowPwd(v => !v)}
-            autoComplete={creating ? 'new-password' : 'current-password'}
+          <AuthField label="Email">
+            <input className="auth-input" type="email" required value={loginEmail} onChange={e => setLoginEmail(e.target.value)} autoComplete="email" autoFocus />
+          </AuthField>
+          <AuthField label="Password">
+            <PasswordField
+              value={loginPassword}
+              onChange={setLoginPassword}
+              show={showPwd}
+              onToggle={() => setShowPwd(v => !v)}
+              autoComplete={creating ? 'new-password' : 'current-password'}
+            />
+          </AuthField>
+          <AuthActions
+            busy={loginLoading}
+            label={creating ? 'Continue' : 'Log in'}
+            aside={
+              creating
+                ? <button type="button" className="btn-link" onClick={() => setAuthMode('signin')}>Already have an account?</button>
+                : (
+                  <>
+                    {ownerNeeded !== false && (
+                      <button type="button" onClick={() => setAuthMode('create')}>Don&rsquo;t have an account?</button>
+                    )}
+                    {ownerNeeded === false && <Link href="/agent">Booth till login</Link>}
+                  </>
+                )
+            }
           />
-          <button className="btn" type="submit" disabled={loginLoading} style={{ marginTop: 22, width: '100%' }}>
-            {loginLoading
-              ? <><span className="spinner spinner-inline" /> {creating ? 'Creating…' : 'Signing in…'}</>
-              : <>{creating ? 'Create owner' : 'Sign in'} <IconArrow /></>}
-          </button>
         </form>
-        {ownerNeeded !== false && (
-          <p className="auth-foot">
-            <button type="button" className="btn-link" onClick={() => setAuthMode(creating ? 'signin' : 'create')}>
-              {creating ? 'Already have a login' : 'Create the first owner'}
-            </button>
-          </p>
-        )}
-        <p className="auth-foot">Booth agent? <Link href="/agent">Check screen</Link></p>
       </AuthShell>
     )
   }
 
   return (
     <div className="app-shell">
-      <Head><title>Operations — Lintel Zambia</title></Head>
+      <Head><title>Operations — MoMo Sentry</title></Head>
       <SandboxBanner />
       <header className="app-bar">
         <BrandLockup />
