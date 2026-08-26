@@ -1,4 +1,5 @@
 import { Verdict } from '../types/sentry'
+import { Ban, CircleSlash, ShieldCheck, TriangleAlert, type LucideIcon } from 'lucide-react'
 
 export function verdictLabel(verdict: string): string {
   return verdict === 'CHECK_FAILED' ? 'CHECK FAILED' : verdict
@@ -11,9 +12,18 @@ const pillClass: Record<string, string> = {
   CHECK_FAILED: 'pill pill-failed',
 }
 
+const pillIcon: Record<string, LucideIcon> = {
+  STOP: Ban,
+  CAUTION: TriangleAlert,
+  SAFE: ShieldCheck,
+  CHECK_FAILED: CircleSlash,
+}
+
 export function VerdictPill({ verdict }: { verdict: string }) {
+  const Icon = pillIcon[verdict] ?? CircleSlash
   return (
     <span className={pillClass[verdict] ?? 'pill pill-failed'}>
+      <Icon size={12} strokeWidth={2.25} aria-hidden />
       {verdict === 'CHECK_FAILED' ? 'FAILED' : verdict}
     </span>
   )

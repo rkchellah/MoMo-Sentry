@@ -17,6 +17,7 @@ import { WhereView } from '../components/WhereView'
 import { claimFirstOwner, fetchOwnerNeeded, postCheck, SANDBOX_CUSTOMERS } from '../lib/sentryApi'
 import {
   BrandLockup, IconArrow, IconInbox, IconPin, IconSearch, IconRefresh,
+  IconList, IconMap, IconLoader, IconBan, IconCaution, IconFailed, IconShield, IconLogOut, IconUsers,
 } from '../components/icons'
 
 const LUSAKA_FALLBACK = { lat: -15.4166, lng: 28.2833 }
@@ -34,7 +35,7 @@ export default function SentryPage() {
   const [loginLoading, setLoginLoading] = useState(false)
   const [showPwd, setShowPwd] = useState(false)
   const [ownerNeeded, setOwnerNeeded] = useState<boolean | null>(null)
-  const [authMode, setAuthMode] = useState<'signin' | 'create'>('create')
+  const [authMode, setAuthMode] = useState<'signin' | 'create'>('signin')
 
   const [tab, setTab] = useState<'queue' | 'where'>('queue')
   const [checks, setChecks] = useState<FraudCheck[]>([])
@@ -70,11 +71,8 @@ export default function SentryPage() {
 
   useEffect(() => {
     fetchOwnerNeeded()
-      .then(needed => {
-        setOwnerNeeded(needed)
-        setAuthMode(needed ? 'create' : 'signin')
-      })
-      .catch(err => setLoginError(err instanceof Error ? err.message : 'Could not check owner setup'))
+      .then(needed => setOwnerNeeded(needed))
+      .catch(() => setOwnerNeeded(true))
     confirmOwner().finally(() => setAuthLoading(false))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       if (!session) setOwnerOk(false)
@@ -114,22 +112,22 @@ export default function SentryPage() {
     await confirmOwner()
   }
 
+  async function enterOperations() {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: loginEmail, password: loginPassword,
+    })
+    if (error) throw error
+    await finishOwnerSession()
+  }
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoginError('')
     setLoginLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({
-      email: loginEmail, password: loginPassword,
-    })
-    if (error) {
-      setLoginError(error.message)
-      setLoginLoading(false)
-      return
-    }
     try {
-      await finishOwnerSession()
+      await enterOperations()
     } catch (err) {
-      setLoginError(err instanceof Error ? err.message : 'Could not create owner')
+      setLoginError(err instanceof Error ? err.message : 'Could not sign in')
     }
     setLoginLoading(false)
   }
@@ -142,6 +140,16 @@ export default function SentryPage() {
       email: loginEmail, password: loginPassword,
     })
     if (error) {
+      if (/already registered/i.test(error.message)) {
+        try {
+          await enterOperations()
+        } catch {
+          setLoginError('This email is already registered. Sign in instead.')
+        }
+        setAuthMode('signin')
+        setLoginLoading(false)
+        return
+      }
       setLoginError(error.message)
       setLoginLoading(false)
       return
@@ -254,7 +262,7 @@ export default function SentryPage() {
     return (
       <div className="page-loader">
         <div>
-          <div className="spinner" />
+          <IconLoader size={20} />
           <p className="hint" style={{ textAlign: 'center' }}>Checking your session…</p>
         </div>
       </div>
@@ -282,6 +290,11 @@ export default function SentryPage() {
               autoComplete={creating ? 'new-password' : 'current-password'}
             />
           </AuthField>
+          {!creating && (
+            <p className="auth-forgot">
+              <Link href="/reset?next=/sentry">Forgot password?</Link>
+            </p>
+          )}
           <AuthActions
             busy={loginLoading}
             label={creating ? 'Continue' : 'Log in'}
@@ -310,8 +323,12 @@ export default function SentryPage() {
       <header className="app-bar">
         <BrandLockup />
         <div className="tabs">
-          <button type="button" className={`tab${tab === 'queue' ? ' is-on' : ''}`} onClick={() => setTab('queue')}>Queue</button>
-          <button type="button" className={`tab${tab === 'where' ? ' is-on' : ''}`} onClick={() => setTab('where')}>Where</button>
+          <button type="button" className={`tab${tab === 'queue' ? ' is-on' : ''}`} onClick={() => setTab('queue')}>
+            <IconList size={14} /> Queue
+          </button>
+          <button type="button" className={`tab${tab === 'where' ? ' is-on' : ''}`} onClick={() => setTab('where')}>
+            <IconMap size={14} /> Where
+          </button>
         </div>
         <form onSubmit={handleCheck} className="bar-form">
           {SANDBOX_CUSTOMERS.slice(0, 3).map(c => (
@@ -329,13 +346,13 @@ export default function SentryPage() {
             style={{ width: 180 }}
           />
           <button type="submit" className="btn btn-sm" disabled={checking}>
-            {checking
-              ? <span className="spinner spinner-inline" />
-              : 'Check'}
+            {checking ? <IconLoader /> : <>Check <IconArrow /></>}
           </button>
           <Link href="/agent" className="btn-link">Agent</Link>
           <ThemeToggle />
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => { supabase.auth.signOut(); setOwnerOk(false) }}>Sign out</button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => { supabase.auth.signOut(); setOwnerOk(false) }}>
+            <IconLogOut size={14} /> Sign out
+          </button>
         </form>
       </header>
       {checkError && (
@@ -373,6 +390,7 @@ export default function SentryPage() {
               >
                 <span className="metric-top">
                   <span className="metric-label">{m.label}</span>
+                  <m.icon size={16} />
                 </span>
                 <span className="metric-value">
                   {checksLoading
@@ -520,13 +538,14 @@ const METRIC_CARDS: {
   foot: string
   tone: string
   filter: string
+  icon: typeof IconShield
   value: (stats: FraudStats, neverChecked: number) => number
 }[] = [
-  { label: 'Checks', foot: 'all time', tone: ' is-quiet', filter: '', value: s => s.total },
-  { label: 'Stop', foot: 'do not pay', tone: ' is-stop', filter: 'STOP', value: s => s.stop },
-  { label: 'Caution', foot: 'ask a question', tone: ' is-caution', filter: 'CAUTION', value: s => s.caution },
-  { label: 'Failed', foot: 'network error', tone: '', filter: 'CHECK_FAILED', value: s => s.failed },
-  { label: 'Never checked', foot: 'registered agents', tone: ' is-quiet', filter: '', value: (_s, n) => n },
+  { label: 'Checks', foot: 'all time', tone: ' is-quiet', filter: '', icon: IconShield, value: s => s.total },
+  { label: 'Stop', foot: 'do not pay', tone: ' is-stop', filter: 'STOP', icon: IconBan, value: s => s.stop },
+  { label: 'Caution', foot: 'ask a question', tone: ' is-caution', filter: 'CAUTION', icon: IconCaution, value: s => s.caution },
+  { label: 'Failed', foot: 'network error', tone: '', filter: 'CHECK_FAILED', icon: IconFailed, value: s => s.failed },
+  { label: 'Never checked', foot: 'registered agents', tone: ' is-quiet', filter: '', icon: IconUsers, value: (_s, n) => n },
 ]
 
 const FILTER_TONE: Record<string, string> = {

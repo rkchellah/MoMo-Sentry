@@ -14,6 +14,15 @@ export function apiBase(): string {
   return url.replace(/\/$/, '')
 }
 
+async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  const base = apiBase()
+  try {
+    return await fetch(`${base}${path}`, init)
+  } catch {
+    throw new Error(`Can't reach the API at ${base}. Start the backend (uvicorn on port 8000) and try again.`)
+  }
+}
+
 export async function postCheck(args: {
   token: string
   phone_number: string
@@ -28,7 +37,7 @@ export async function postCheck(args: {
   agent_id?: string
   agent_name?: string
 }> {
-  const res = await fetch(`${apiBase()}/check`, {
+  const res = await apiFetch('/check', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -49,7 +58,7 @@ export async function postCheck(args: {
 }
 
 export async function fetchOwnerNeeded(): Promise<boolean> {
-  const res = await fetch(`${apiBase()}/setup/owner-needed`)
+  const res = await apiFetch('/setup/owner-needed')
   const body = await res.json().catch(() => ({}))
   if (!res.ok) {
     const detail = typeof body.detail === 'string' ? body.detail : 'Could not check owner setup'
@@ -59,7 +68,7 @@ export async function fetchOwnerNeeded(): Promise<boolean> {
 }
 
 export async function claimFirstOwner(token: string): Promise<void> {
-  const res = await fetch(`${apiBase()}/setup/claim-owner`, {
+  const res = await apiFetch('/setup/claim-owner', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   })

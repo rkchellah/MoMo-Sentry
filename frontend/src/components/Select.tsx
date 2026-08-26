@@ -4,6 +4,7 @@
 // list itself so it matches, and keeps the keyboard contract of a real select.
 
 import React from 'react'
+import { IconCheck, IconChevronDown } from './icons'
 
 export interface SelectOption {
   value: string
@@ -140,9 +141,7 @@ export function Select({
         aria-label={ariaLabel}
       >
         <span className="select-value">{label}</span>
-        <svg className="select-caret" width="12" height="8" viewBox="0 0 12 8" fill="none" aria-hidden>
-          <path d="M1 1.5 6 6.5l5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <IconChevronDown className="select-caret" />
       </button>
 
       {open && (
@@ -166,11 +165,7 @@ export function Select({
               onClick={() => pick(i)}
             >
               <span className="select-opt-label">{o.label}</span>
-              {o.value === value && (
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
-                  <path d="M2 6.4 4.6 9 10 3.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              )}
+              {o.value === value && <IconCheck />}
             </li>
           ))}
         </ul>

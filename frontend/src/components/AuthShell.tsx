@@ -58,6 +58,14 @@ export function AuthError({ children }: { children: ReactNode }) {
   )
 }
 
+export function AuthNotice({ children }: { children: ReactNode }) {
+  return (
+    <div className="auth-notice" role="status">
+      <span>{children}</span>
+    </div>
+  )
+}
+
 export function PasswordField(props: {
   value: string
   onChange: (value: string) => void
