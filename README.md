@@ -4,55 +4,65 @@ Mobile money fraud in Zambia follows a pattern. Someone convinces a telecom agen
 
 ---
 
+## Live
+
+The app is two Render services. Free instances sleep after ~15 minutes idle — the first request can take a minute.
+
+| What | URL |
+|---|---|
+| App (chooser) | https://momo-sentry-1.onrender.com |
+| Booth till | https://momo-sentry-1.onrender.com/agent |
+| Booth register | https://momo-sentry-1.onrender.com/agent-register |
+| Operations | https://momo-sentry-1.onrender.com/sentry |
+| Password reset | https://momo-sentry-1.onrender.com/reset |
+| API | https://momo-sentry.onrender.com |
+| API health | https://momo-sentry.onrender.com/health |
+
+Local: frontend `http://localhost:3000`, API `http://localhost:8000`.
+
+Confirm the API with `GET /health`. `"status": "ok"` and `"supabase": true` means it can log checks and create the first owner. `"degraded"` with `missing_env` means keys are not set on that host — see `BUGS.md` BUG-008 for the live API.
+
+---
+
 ## What it does
 
-A booth agent opens the check screen, types in a customer's number, and hits check. MoMo Sentry calls Nokia's 
-Network as Code CAMARA APIs in parallel:
+A booth agent opens the till, types a customer's number, and hits check. The FastAPI backend calls Nokia Network as Code CAMARA APIs in parallel:
 
-- **SIM Swap API** — was this SIM swapped in the last 72 hours?
-- **Device Swap API** — did the SIM move to a new handset?
-- **Device Status API** — is the device actually connected right now?
+- **SIM Swap** — was this SIM swapped in the last 72 hours?
+- **Device Swap** — did the SIM move to a new handset?
+- **Device Status** — is the device connected right now?
 
-The AI narrates a verdict that `risk.py` already decided from Nokia. DeepSeek does not pick tools or set the badge.
+`risk.py` sets the badge from those results. DeepSeek only explains it in one or two sentences. It does not pick tools or change the verdict.
 
-🟢 **SAFE** — No SIM swap in the last 72 hours on this number. Not proof the person is legitimate.  
-🟡 **CAUTION** — Something is off. Ask a question before releasing.  
-🔴 **STOP** — SIM or device was swapped recently. Do not release cash.  
-⚫ **CHECK FAILED** — Nokia did not answer, or this environment cannot query that number. Do not treat as safe.
+- **SAFE** — No SIM swap in the last 72 hours on this number. Not proof the person is legitimate.
+- **CAUTION** — Something is off. Ask a question before releasing.
+- **STOP** — SIM or device was swapped recently. Do not release cash.
+- **CHECK FAILED** — Nokia did not answer, or this environment cannot query that number. Do not treat as safe.
 
-Every check is logged. The booth owner sees all flags plotted on a Lusaka satellite map — one dot per agent, coloured by their most recent check verdict. Click an agent's dot to see their full check history. Click View Logs for the full table. That log is designed for booth owners, telcos, ZICTA, and law enforcement to identify repeat fraud numbers and act.
+Every check is logged. Operations (`/sentry`) shows the queue and a Lusaka map — one pin per booth, coloured by the latest verdict.
 
 ---
 
 ## Two screens, two users
 
-**`par-map.vercel.app/agent`** — the agent screen  
-The booth agent uses this before releasing cash. Sign in once, your location is pre-set. Type a number, get a verdict in under 3 seconds.
+**`/agent` — booth till**  
+Phone-width webapp for agents on a smartphone. Same dark AuthShell login as operations. After sign-in: number field, sandbox chips, booth picker, floating Check bar.
 
-**`par-map.vercel.app/sentry`** — the owner and analyst screen  
-The booth owner, telco analyst, or investigator uses this. Every registered agent appears as a dot at their permanent booth location. Click to see their check history. The pattern of who is getting hit, when, and with which numbers is visible at a glance.
+**`/sentry` — operations**  
+Booth owner or analyst. Queue of every check, KPIs, repeat numbers, agents who never checked, Where map.
 
----
+**`/` — chooser**  
+Pick booth check or operations. The app does not auto-redirect to `/agent`.
 
-## The moment it clicked
-
-I ran the first live check against a Nokia simulator number. The API came back — `swapped: true`. The agent narrated it in one sentence:
-
-*"The SIM card for this number was swapped recently and the device has also changed, which is a strong indicator that someone is trying to commit fraud — do not release cash."*
-
-That's when this stopped feeling like a demo.
+Roles live in `momo_profiles`. Agents cannot open operations. Owners cannot open the till. The first owner is claimed with `POST /setup/claim-owner` when `GET /setup/owner-needed` is true.
 
 ---
 
-## How the agentic AI works
+## How a check is decided
 
-The AI agent doesn't just receive pre-computed results and narrate them. It decides which Nokia NaC tools to call, calls them, reasons over what comes back, and decides if it needs more information before giving a verdict.
+Nokia is called in parallel. `risk.py` scores. DeepSeek narrates the already-decided badge. Session memory in `agent_sessions` can mention earlier flagged checks in this sitting.
 
-That's the difference between a lookup tool and an agent.
-
-The verdict itself is driven entirely by what Nokia's APIs returned — SIM swapped means STOP, no exceptions. DeepSeek explains the decision in plain English. It does not make the safety call. The Nokia APIs do.
-
-The agent also holds session memory. If you check three numbers in a row and two come back flagged, it notices. It will say "this is the second suspicious number checked here today." That context is what a single API call can't give you.
+SIM swap HTTP failure is always **CHECK FAILED**, never SAFE. The Nokia sandbox is not a clean scenario table — STOP chips can 400, and SAFE chips can come back `swapped: true`. That is Nokia, not a down API. Logged in `BUGS.md`.
 
 ---
 
@@ -61,11 +71,14 @@ The agent also holds session memory. If you check three numbers in a row and two
 | Layer | Technology |
 |---|---|
 | CAMARA APIs | Nokia Network as Code — SIM Swap, Device Swap, Device Status |
-| Backend | Python FastAPI |
-| AI Agent | DeepSeek (`deepseek-chat`) with persistent session memory |
-| Database | Supabase (PostgreSQL) — shared with PAR-Map |
-| Map | Mapbox + Leaflet via PAR-Map |
-| Deployment | Render — API at `momo-sentry.onrender.com`, Next.js as a second Web Service |
+| Backend | Python FastAPI (`backend/`) |
+| Narration | DeepSeek (`deepseek-chat`) |
+| Database | Supabase (PostgreSQL) — shared with PAR-Map; do not touch PAR-Map tables |
+| Frontend | Next.js in this repo (`frontend/`) |
+| Icons | Lucide |
+| Map | Mapbox + Leaflet |
+| Auth | Supabase Auth, cookie `sb-momo-auth-token` |
+| Deploy | Render — API `momo-sentry.onrender.com`, web `momo-sentry-1.onrender.com` |
 
 ---
 
@@ -74,50 +87,61 @@ The agent also holds session memory. If you check three numbers in a row and two
 ```
 Agent types a number
        ↓
-POST /check  {phone_number, agent_location, agent_id}
+POST /check  {phone_number, agent_location} + Bearer JWT
        ↓
-DeepSeek agent decides which Nokia NaC tools to call
+camara.run_checks — SIM Swap + Device Swap + Device Status in parallel
        ↓
-Calls SIM Swap + Device Swap + Device Status in parallel
+risk.py sets SAFE / CAUTION / STOP / CHECK_FAILED
        ↓
-Reasons over all three results
-       ↓
-Returns: STOP/CAUTION/SAFE + plain English narration
+DeepSeek narrates (does not change the badge)
        ↓
 Logged to Supabase fraud_checks
        ↓
-Map updates — agent's dot reflects latest verdict
+Till shows Last check; operations queue and map update
 ```
+
+Full plan: `ARCHITECTURE.md`. Open issues: `BUGS.md`.
 
 ---
 
 ## Running locally
 
+Two terminals. Nokia key is `NAC_API_KEY` in `backend/.env` — never `NEXT_PUBLIC_*`.
+
 ```bash
+# API
 cd backend
 python -m venv env
-source env/bin/activate       # Windows: env\Scripts\activate
+env\Scripts\activate          # macOS/Linux: source env/bin/activate
 pip install -r requirements.txt
-
 cp .env.example .env
-# Fill in Nokia NaC API key, DeepSeek key, Supabase credentials
-# Also set NAC_MODE=sandbox, REQUIRE_AUTH=true, FRONTEND_ORIGIN=http://localhost:3000
-# NAC_MODE=sandbox  REQUIRE_AUTH=true
-
-uvicorn main:app --reload
+# Fill NAC_API_KEY, DEEPSEEK_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY
+# NAC_MODE=sandbox  REQUIRE_AUTH=true  FRONTEND_ORIGIN=http://localhost:3000
+python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Backend runs on `http://localhost:8000`. The frontend lives in the PAR-Map repo at `par-map.vercel.app/agent` and `par-map.vercel.app/sentry`.
+```bash
+# Web
+cd frontend
+npm install
+# .env.local: NEXT_PUBLIC_MOMO_SENTRY_API=http://localhost:8000
+# plus NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_MAPBOX_TOKEN
+npm run dev
+```
+
+Open `http://localhost:3000`. CORS allows localhost via regex even if `FRONTEND_ORIGIN` is only the production origin.
+
+Password reset: add `http://localhost:3000/reset` and `https://momo-sentry-1.onrender.com/reset` under Supabase Auth → Redirect URLs.
 
 ---
 
 ## Deploy on Render
 
-Two Web Services. The API is `https://momo-sentry.onrender.com`. Confirm it with `GET /health` — `"supabase": true` means the service-role key is set. `"supabase": false` means login and checks will 503 until you add `SUPABASE_URL` and `SUPABASE_SERVICE_KEY`.
+Two Web Services (`render.yaml`).
 
-### API (`backend/`)
+### API — https://momo-sentry.onrender.com
 
-Already created as **MoMo-Sentry**. Environment → add every key from `backend/.env` (not `.env.local`):
+Root `backend/`. Start: `uvicorn main:app --host 0.0.0.0 --port $PORT`. Health: `/health`.
 
 ```
 NAC_API_KEY
@@ -126,25 +150,14 @@ DEEPSEEK_API_KEY
 DEEPSEEK_MODEL=deepseek-chat
 SUPABASE_URL
 SUPABASE_SERVICE_KEY
-FRONTEND_ORIGIN=http://localhost:3000
+FRONTEND_ORIGIN=https://momo-sentry-1.onrender.com,http://localhost:3000
 REQUIRE_AUTH=true
 PYTHON_VERSION=3.12.8
 ```
 
-After the frontend is live, set `FRONTEND_ORIGIN` to `https://<frontend>.onrender.com,http://localhost:3000` (no trailing slash) and Manual Deploy the API.
+### Frontend — https://momo-sentry-1.onrender.com
 
-Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`. Health check path: `/health`.
-
-### Frontend (`frontend/`)
-
-New Web Service, same repo:
-
-| Field | Value |
-|---|---|
-| Root Directory | `frontend` |
-| Runtime | Node |
-| Build | `npm install && npm run build` |
-| Start | `npm start` |
+Root `frontend/`. Build `npm install && npm run build`. Start `npm start`.
 
 ```
 NODE_VERSION=20
@@ -154,66 +167,54 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_MAPBOX_TOKEN=
 ```
 
-Copy the last three from `frontend/.env.local`. `NEXT_PUBLIC_*` is baked in at build time — set them before the first build.
-
-In Supabase → Authentication → URL Configuration, set Site URL to the frontend Render origin and add it under Redirect URLs.
-
-Then open `/sentry`, create the first owner account (or insert into `momo_profiles`). Run `supabase/migrations/002_production_auth.sql` first if that table is missing.
-
-A paid instance stays awake. Free web services sleep after 15 minutes idle.
+`NEXT_PUBLIC_*` is baked in at build time. After changing them, rebuild the frontend.
 
 ---
 
 ## Nokia NaC simulator numbers
 
-Nokia provides simulator numbers that return predictable responses. No real Zambian SIM needed to test this project.
+No real Zambian SIM. Only `+999…`. A `+260` / `097…` number returns CHECK FAILED.
 
-| Number | Expected result |
-|---|---|
-| +99999991000 | SAFE — no swap detected, device connected |
-| +99999991001 | SAFE — clean |
-| +99999990400 | STOP — SIM swap detected |
-| +99999990404 | STOP — SIM swap detected |
-| +99999990422 | CAUTION — device status anomaly |
+| Number | Intended result | What Nokia often does now |
+|---|---|---|
+| +99999991000 | SAFE | 200, but `swapped: true` → STOP |
+| +99999991001 | SAFE | same class as above |
+| +99999990400 | STOP | 400 Bad Request → CHECK FAILED |
+| +99999990404 | STOP | often 400 / unsupported |
+| +99999990422 | CAUTION | often 400 / unsupported |
 
-> Note: The Nokia NaC sandbox returns swapped: true for all valid numbers in the current simulator version. In production, real network data would return false for legitimate SIMs.
+The chips on the till are the intended story. Trust the badge on screen, not the chip label, until Nokia's sandbox matches the table. Details: `BUGS.md` BUG-006 and BUG-007.
 
 ---
 
 ## Database
 
-This project shares the same Supabase project as PAR-Map. Isolation is by table and auth cookie, not a second database — see `ARCHITECTURE.md`.
-
-Run the migrations in order:
+Same Supabase project as PAR-Map. Isolation is by table and auth cookie, not a second database — see `ARCHITECTURE.md`.
 
 ```bash
-supabase/migrations/001_fraud_checks.sql    # fraud_checks
-supabase/migrations/002_production_auth.sql # roles, sessions, CHECK_FAILED
-supabase/migrations/003_rls_lockdown.sql    # RLS on booth tables, drop broad read
+supabase/migrations/001_fraud_checks.sql
+supabase/migrations/002_production_auth.sql
+supabase/migrations/003_rls_lockdown.sql
 ```
 
-Seed an owner in `momo_profiles` and confirm the owner queue loads **before** running `003` — it drops the policy that currently lets any authenticated session read `fraud_checks`. Rollback is at the bottom of that file.
-
-Never alter PAR-Map tables (`customers`, `profiles`, `teams`, `kmz_layers`, `buffer_layers`, Storage `kmz-files`). Before pasting any SQL into the Supabase editor:
+Never alter PAR-Map tables (`customers`, `profiles`, `teams`, `kmz_layers`, `buffer_layers`, Storage `kmz-files`). Before pasting SQL:
 
 ```bash
 python scripts/check_migrations.py
 ```
 
-It fails the build if a migration names a PAR-Map table or mutates a Supabase-managed one, and runs in CI on every change under `supabase/`. It guards the repo, not the SQL editor — run it yourself before pasting.
-
 ---
 
 ## What isn't in the prototype
 
-**Number Verification** is documented in `camara.py`. It requires the customer to click an OAuth link on their own phone — a real flow for high-value transactions, but friction that doesn't belong in a prototype demo.
+**Number Verification** is documented in `camara.py`. It needs the customer to tap an OAuth link on their phone.
 
-**SMS alerts** were dropped. The DeepSeek narration in the UI is the alert. Africa's Talking integration is one function call in production.
+**SMS alerts** were dropped. The narration in the UI is the alert.
 
-**USSD interface** is the right long-term tool for booth agents who don't have smartphones. It requires MNO partnership — MTN Zambia or Airtel Zambia would need to be onboarded to the Nokia NaC platform. That's a business conversation, not a technical one.
+**USSD** is the long-term till for agents without smartphones. That needs an MNO on Nokia NaC.
 
 ---
 
 ## Known constraints
 
-False positives are real. A legitimate SIM replacement looks identical to a fraudulent one at the API level. The tool flags and warns. The agent always makes the final call. That's by design.
+A legitimate SIM replacement looks identical to a fraudulent one at the API level. The tool flags. The agent always makes the final call.

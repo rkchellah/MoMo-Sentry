@@ -112,3 +112,78 @@ Changed model to `llama-3.3-70b-versatile` which is the recommended replacement 
 Preview models get deprecated fast. Always use production model IDs, not preview ones.
 
 ---
+
+## Open — not fixed yet
+
+These were confirmed in August 2026. Do not “fix” them by lying about Nokia’s response. Show CHECK FAILED or STOP as `risk.py` already does.
+
+### BUG-006 — STOP sandbox number returns 400 (open)
+
+**Date:** 2026-08-26  
+**Files:** `backend/camara.py`, till chips in `frontend/src/lib/sentryApi.ts`  
+**Symptom:** Chip **Stop** (`+99999990400`) shows **FAILED** / CHECK FAILED. Narration says the checks did not complete. `POST /check` is HTTP 200.  
+**Cause:** Nokia NaC SIM Swap for `+99999990400` returns `400 {"detail":"Bad Request"}`. `risk.py` treats a SIM-swap error as CHECK FAILED so the booth never treats it as SAFE. Same class as BUG-004 (`+99999990404`, `+99999990422` often fail the same way).  
+**Not done:** No workaround that invents a STOP. No remap to another number. Wait for Nokia sandbox, or pick a number that actually 200s.  
+**Check:** From `backend/`, POST SIM Swap for `+99999991000` (200) vs `+99999990400` (400).
+
+### BUG-007 — SAFE sandbox number comes back swapped (open)
+
+**Date:** 2026-08-26  
+**Files:** `backend/risk.py`, `backend/test_api.py`  
+**Symptom:** Chip **Safe** (`+99999991000`) can show **STOP** (“SIM and device were swapped”).  
+**Cause:** Current Nokia sandbox returns `{"swapped": true}` for valid numbers, including the “SAFE” ones. `risk.py` is correct: swapped → STOP.  
+**Not done:** Do not special-case `+99999991000` as SAFE. The chip is the intended story; the badge is the network.
+
+### BUG-008 — Live API health is degraded (open)
+
+**Date:** 2026-08-26  
+**Host:** https://momo-sentry.onrender.com/health  
+**Symptom:** `"status": "degraded"`, `"supabase": false`, `missing_env`: `DEEPSEEK_API_KEY`, `SUPABASE_SERVICE_KEY`. HTTP 200.  
+**Cause:** Those keys are not set on the Render API service (or still placeholders). Local `http://localhost:8000/health` was `"ok"` with `"supabase": true`.  
+**Not done:** Add the keys in Render → momo-sentry → Environment, then redeploy. Frontend live URL is https://momo-sentry-1.onrender.com and must keep `NEXT_PUBLIC_MOMO_SENTRY_API=https://momo-sentry.onrender.com`. Local `.env.local` points at `http://localhost:8000`, so this does not break `npm run dev`.
+
+### BUG-009 — “Opening the till…” can hang (open)
+
+**Date:** 2026-08-26  
+**File:** `frontend/src/pages/agent.tsx`  
+**Symptom:** `/agent` stays on the loader past 3 seconds. Register (`/agent-register`) loads because it does not wait on session.  
+**Cause:** `setTimeout(..., 3000)` is cleared when `getSession()` resolves with a session, then `loadAgent()` (Supabase `booth_agents` query) never returns. No timeout around `loadAgent`.  
+**Not done:** Race `loadAgent` with a timeout; still show login if the row is missing. Do not remove the loader without that.
+
+### BUG-010 — Viewport meta warning (open)
+
+**Date:** 2026-08-26  
+**File:** `frontend/src/pages/_document.tsx`  
+**Symptom:** Next.js: viewport meta tags should not be used in `_document.js`'s `<Head>`.  
+**Cause:** `viewport` and apple-mobile-web-app tags live in `_document.tsx`. Next 15 wants viewport in `next/head` metadata on pages or `app`.  
+**Not done:** Move viewport to the Next 15 metadata API. PWA tags can stay; they are not the warning.
+
+### BUG-011 — Password reset needs Redirect URLs (ops, open)
+
+**Date:** 2026-08-26  
+**Files:** `frontend/src/pages/reset.tsx`, login “Forgot password?”  
+**Symptom:** Reset email link 404s or returns to the wrong app if Supabase Auth Redirect URLs omit `/reset`.  
+**Not done in code.** In Supabase → Authentication → URL Configuration add:
+
+- `http://localhost:3000/reset`
+- `https://momo-sentry-1.onrender.com/reset`
+
+Site URL should be the live web origin.
+
+---
+
+## Fixed this round (2026-08-26)
+
+Logged so they are not re-opened as “the till is broken.”
+
+| ID | What | Fix |
+|---|---|---|
+| BUG-012 | `/` sent everyone to `/agent` | Removed the Next redirect. Chooser is `frontend/src/pages/index.tsx`. |
+| BUG-013 | Login was email then a second Continue for password | One form: email + password, **Log in**. |
+| BUG-014 | Agent login restyled as a light blue kit, then asked to revert | AuthShell again. Till after login uses `globals.css` tokens only. |
+| BUG-015 | Result and KPI cards had a thick black left edge | Removed `border-left` / `border-left-width` on `.result.is-*` and `.metric.is-*`. |
+| BUG-016 | Soft, blurry type and custom SVGs | IBM Plex, real font weights, no bar `backdrop-filter`. Lucide via `lucide-react`. |
+| BUG-017 | `Failed to fetch` on owner create when API was down | Local uvicorn on `:8000`. `sentryApi.ts` names the API URL in the error. CORS localhost regex in `backend/main.py`. |
+| BUG-018 | Render probe 404 on `GET /` | API root returns a small JSON index (`backend/main.py`). Health stays `/health`. |
+
+---
