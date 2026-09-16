@@ -32,8 +32,8 @@ type IconProps = LucideProps
 
 const defaults = { strokeWidth: 1.5, 'aria-hidden': true as const }
 
-/** Four squares in a diamond - brand mark. */
-export function BrandMark({ size = 28 }: { size?: number }) {
+/** Four squares in a diamond — brand mark. */
+export function BrandMark({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 18 18" aria-hidden className="brand-mark">
       <rect x="6.75" y="1" width="4.5" height="4.5" fill="currentColor" />
@@ -129,11 +129,11 @@ export function IconUsers(props: IconProps) {
 
 export function BrandLockup({ invert = false }: { invert?: boolean }) {
   return (
-    <div className={cn('inline-flex items-center gap-3 text-foreground', invert && 'text-primary-foreground')}>
+    <div className={cn('inline-flex items-center gap-2 text-foreground', invert && 'text-primary-foreground')}>
       <span className="text-primary">
-        <BrandMark size={32} />
+        <BrandMark size={18} />
       </span>
-      <span className="text-xl font-normal tracking-tight sm:text-2xl">MoMo Sentry</span>
+      <span className="text-sm font-normal tracking-tight">MoMo Sentry</span>
     </div>
   )
 }
