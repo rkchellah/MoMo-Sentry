@@ -1,5 +1,5 @@
 """
-db.py — single Supabase service-role client.
+db.py - single Supabase service-role client.
 """
 
 from __future__ import annotations

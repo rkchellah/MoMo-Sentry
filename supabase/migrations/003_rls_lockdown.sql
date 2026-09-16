@@ -1,4 +1,4 @@
--- MoMo Sentry — 003: close the shared-database read/write leaks
+-- MoMo Sentry - 003: close the shared-database read/write leaks
 -- Run in the Supabase SQL editor after 002_production_auth.sql.
 --
 -- WHY

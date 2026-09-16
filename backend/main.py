@@ -1,8 +1,8 @@
 """
-main.py — MoMo Sentry FastAPI backend
+main.py - MoMo Sentry FastAPI backend
 
-POST /check  — Nokia sandbox check + DeepSeek narration
-GET  /health — liveness
+POST /check  - Nokia sandbox check + DeepSeek narration
+GET  /health - liveness
 """
 
 from __future__ import annotations

@@ -1,5 +1,5 @@
 """
-test_api.py — Verify Nokia NaC API calls before running the full app
+test_api.py - Verify Nokia NaC API calls before running the full app
 
 Run this first:
   cd backend
@@ -7,7 +7,7 @@ Run this first:
 
 Note on simulator: All working numbers return swapped: True for both
 SIM Swap and Device Swap. The simulator does not distinguish between
-safe and flagged numbers — it just confirms the API is reachable and
+safe and flagged numbers - it just confirms the API is reachable and
 returning valid responses. Real network data would return false for
 legitimate numbers.
 """
@@ -123,7 +123,7 @@ async def test_connectivity():
 
 async def main():
     print("=" * 55)
-    print("MoMo Sentry — Nokia NaC API Test")
+    print("MoMo Sentry - Nokia NaC API Test")
     print("=" * 55)
 
     passed = 0

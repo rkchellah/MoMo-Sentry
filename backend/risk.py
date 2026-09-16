@@ -1,14 +1,14 @@
 """
-risk.py — Risk scoring logic
+risk.py - Risk scoring logic
 
 Takes SIM Swap, Device Swap, and Device Status signals
 and returns a verdict.
 
 Verdict levels:
-  SAFE         — no suspicious signals in the lookback window
-  CAUTION      — something is off, agent should ask questions
-  STOP         — high fraud risk, do not release cash
-  CHECK_FAILED — Nokia call failed; must not be treated as SAFE
+  SAFE         - no suspicious signals in the lookback window
+  CAUTION      - something is off, agent should ask questions
+  STOP         - high fraud risk, do not release cash
+  CHECK_FAILED - Nokia call failed; must not be treated as SAFE
 
 Weights are transparent and explainable. No black box.
 """
@@ -72,7 +72,7 @@ def score(
             signals.append("Device is not connected to the network")
         elif device.connectivity == "CONNECTED_SMS":
             risk_score += 0.10
-            signals.append("Device is on SMS only — not on data")
+            signals.append("Device is on SMS only - not on data")
 
         if device.roaming:
             risk_score += 0.15
@@ -123,7 +123,7 @@ def _build_reason(
     if verdict == "STOP":
         if sim.swapped and device_swap.swapped:
             return (
-                "Both the SIM and the device were recently swapped — "
+                "Both the SIM and the device were recently swapped - "
                 "this is a strong fraud signal. Do not release cash."
             )
         if sim.swapped:
@@ -133,7 +133,7 @@ def _build_reason(
     if verdict == "CAUTION":
         first = signals[0].lower() if signals else "a network signal could not be confirmed"
         return (
-            f"One risk signal detected — {first} — "
+            f"One risk signal detected - {first} - "
             "ask the customer a verification question before proceeding."
         )
 

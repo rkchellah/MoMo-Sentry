@@ -26,10 +26,23 @@ import {
   Users,
   type LucideProps,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 type IconProps = LucideProps
 
-const defaults = { strokeWidth: 2, 'aria-hidden': true as const }
+const defaults = { strokeWidth: 1.5, 'aria-hidden': true as const }
+
+/** Four squares in a diamond - brand mark. */
+export function BrandMark({ size = 28 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" aria-hidden className="brand-mark">
+      <rect x="6.75" y="1" width="4.5" height="4.5" fill="currentColor" />
+      <rect x="1" y="6.75" width="4.5" height="4.5" fill="currentColor" />
+      <rect x="12.5" y="6.75" width="4.5" height="4.5" fill="currentColor" />
+      <rect x="6.75" y="12.5" width="4.5" height="4.5" fill="currentColor" />
+    </svg>
+  )
+}
 
 export function IconEye(props: IconProps) {
   return <Eye size={16} {...defaults} {...props} />
@@ -116,12 +129,11 @@ export function IconUsers(props: IconProps) {
 
 export function BrandLockup({ invert = false }: { invert?: boolean }) {
   return (
-    <div className="brand">
-      <ShieldCheck size={18} strokeWidth={2} aria-hidden className="brand-mark" />
-      <div className="brand-copy">
-        <div className={`brand-kicker${invert ? ' is-invert' : ''}`}>Fraud checks</div>
-        <div className="brand-name">MoMo Sentry</div>
-      </div>
+    <div className={cn('inline-flex items-center gap-3 text-foreground', invert && 'text-primary-foreground')}>
+      <span className="text-primary">
+        <BrandMark size={32} />
+      </span>
+      <span className="text-xl font-normal tracking-tight sm:text-2xl">MoMo Sentry</span>
     </div>
   )
 }

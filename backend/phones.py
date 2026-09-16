@@ -1,5 +1,5 @@
 """
-phones.py — sandbox vs production number rules.
+phones.py - sandbox vs production number rules.
 
 Sandbox (NAC_MODE=sandbox): only Nokia simulator MSISDNs (+999…).
 Real Zambian numbers are rejected, never remapped to a simulator.
@@ -40,7 +40,7 @@ def looks_zambian(normalized: str) -> bool:
 def resolve_phone(raw: str) -> tuple[str | None, str | None]:
     """
     Return (normalized_e164, reject_message).
-    If reject_message is set, the check must be CHECK_FAILED — do not call Nokia.
+    If reject_message is set, the check must be CHECK_FAILED - do not call Nokia.
     """
     if not raw or not raw.strip():
         return None, "Enter a phone number."

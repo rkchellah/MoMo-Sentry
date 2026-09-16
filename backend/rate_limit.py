@@ -1,5 +1,5 @@
 """
-rate_limit.py — per-user sliding window for /check.
+rate_limit.py - per-user sliding window for /check.
 """
 
 from __future__ import annotations

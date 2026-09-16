@@ -1,5 +1,5 @@
 """
-agent.py — Deterministic fraud check + DeepSeek narration.
+agent.py - Deterministic fraud check + DeepSeek narration.
 
 Nokia APIs run in parallel. risk.py sets the verdict.
 DeepSeek only explains it. It does not call tools or set the badge.
@@ -28,7 +28,7 @@ Explain in 1-2 plain sentences what the agent should do.
 Rules:
 - Never use jargon: no API, connectivity status, latestSimChange, sandbox internals
 - Do not start with SAFE:, CAUTION:, STOP:, or CHECK_FAILED:
-- If the verdict is SAFE, say there was no SIM swap in the last 72 hours — not that the person is legitimate
+- If the verdict is SAFE, say there was no SIM swap in the last 72 hours - not that the person is legitimate
 - If CHECK_FAILED, tell them not to treat the number as safe
 - If earlier checks in this session were also flagged, mention that pattern
 - Use the phone number exactly as given. Do not invent a Zambian number
