@@ -136,11 +136,20 @@ These were confirmed in August 2026. Do not “fix” them by lying about Nokia�
 
 ### BUG-008 - Live API health is degraded (open)
 
-**Date:** 2026-08-26  
+**Date:** 2026-08-26 (updated 2026-09-16)  
 **Host:** https://momo-sentry.onrender.com/health  
-**Symptom:** `"status": "degraded"`, `"supabase": false`, `missing_env`: `DEEPSEEK_API_KEY`, `SUPABASE_SERVICE_KEY`. HTTP 200.  
+**Symptom:** `"status": "degraded"`, `"supabase": false`, `missing_env`: `DEEPSEEK_API_KEY`, `SUPABASE_SERVICE_KEY`. HTTP 200. `/setup/owner-needed` and `/check` return **503** `Auth service unavailable`.  
 **Cause:** Those keys are not set on the Render API service (or still placeholders). Local `http://localhost:8000/health` was `"ok"` with `"supabase": true`.  
 **Not done:** Add the keys in Render → momo-sentry → Environment, then redeploy. Frontend live URL is https://momo-sentry-1.onrender.com and must keep `NEXT_PUBLIC_MOMO_SENTRY_API=https://momo-sentry.onrender.com`. Local `.env.local` points at `http://localhost:8000`, so this does not break `npm run dev`.
+
+### BUG-012 - Production CORS blocks live web origin (fixed in code)
+
+**Date:** 2026-09-16  
+**Hosts:** web `https://momo-sentry-1.onrender.com` → API `https://momo-sentry.onrender.com`  
+**Symptom:** Browser console: `No 'Access-Control-Allow-Origin' header`. UI showed “Can't reach the API… uvicorn on port 8000”. OPTIONS preflight returned **400** for the live origin; localhost:3000 still got `access-control-allow-origin`.  
+**Cause:** Render `FRONTEND_ORIGIN` only allowed `http://localhost:3000` (`sync: false` and never set to the live web URL). Starlette CORS rejects unknown origins without `Access-Control-Allow-Origin`, which the browser reports as CORS.  
+**Fix:** `backend/main.py` always allows `https://momo-sentry-1.onrender.com` and localhost; `render.yaml` sets `FRONTEND_ORIGIN` explicitly; frontend error copy no longer blames uvicorn for production URLs.  
+**Still needed after deploy:** Set `SUPABASE_SERVICE_KEY` and `DEEPSEEK_API_KEY` on the API (BUG-008) or checks stay 503 even with CORS fixed.
 
 ### BUG-009 - “Opening the till…” can hang (open)
 
