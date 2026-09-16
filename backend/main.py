@@ -28,9 +28,21 @@ from rate_limit import check_rate
 
 
 def _cors_origins() -> list[str]:
-    raw = os.environ.get("FRONTEND_ORIGIN", "http://localhost:3000")
-    origins = [o.strip() for o in raw.split(",") if o.strip()]
-    return origins or ["http://localhost:3000"]
+    """Origins allowed to call this API from a browser.
+
+    Always include the known live web host. A missing/wrong FRONTEND_ORIGIN on
+    Render previously bricked production with opaque CORS errors while
+    localhost still worked.
+    """
+    raw = os.environ.get("FRONTEND_ORIGIN", "")
+    origins = [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
+    for required in (
+        "http://localhost:3000",
+        "https://momo-sentry-1.onrender.com",
+    ):
+        if required not in origins:
+            origins.append(required)
+    return origins
 
 
 def _auth_required() -> bool:

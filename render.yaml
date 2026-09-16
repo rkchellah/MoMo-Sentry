@@ -25,7 +25,7 @@ services:
       - key: SUPABASE_SERVICE_KEY
         sync: false
       - key: FRONTEND_ORIGIN
-        sync: false
+        value: https://momo-sentry-1.onrender.com,http://localhost:3000
       - key: NAC_MODE
         value: sandbox
       - key: REQUIRE_AUTH
