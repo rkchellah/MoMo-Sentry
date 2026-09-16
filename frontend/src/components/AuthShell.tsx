@@ -71,7 +71,6 @@ export function AuthShell({
             />
             <div className="relative flex h-full flex-col justify-between p-12 xl:px-16">
               <div className="flex flex-col gap-5">
-                <BrandLockup />
                 <h2 className="max-w-sm text-3xl font-normal tracking-tight text-foreground">
                   CAMARA SIM Swap, Device Swap, and Device Status - before payout.
                 </h2>

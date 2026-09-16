@@ -46,7 +46,6 @@ export default function Home() {
               className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,color-mix(in_oklch,var(--primary)_16%,transparent),transparent_55%),radial-gradient(ellipse_at_bottom_left,color-mix(in_oklch,var(--muted-foreground)_10%,transparent),transparent_50%)]"
             />
             <div className="relative flex h-full flex-col justify-end gap-6 p-12 xl:px-16">
-              <BrandLockup />
               <div className="flex flex-col gap-3 text-xl font-normal tracking-tight text-foreground">
                 <p>/agent - booth till</p>
                 <p>/sentry - operations</p>
