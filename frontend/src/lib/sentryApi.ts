@@ -19,7 +19,12 @@ async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   try {
     return await fetch(`${base}${path}`, init)
   } catch {
-    throw new Error(`Can't reach the API at ${base}. Start the backend (uvicorn on port 8000) and try again.`)
+    const local = /localhost|127\.0\.0\.1/.test(base)
+    throw new Error(
+      local
+        ? `Can't reach the API at ${base}. Start the backend (uvicorn on port 8000) and try again.`
+        : `Can't reach the API at ${base}. The service may be waking up, down, or blocking this origin (CORS). Check Render → momo-sentry → Logs / Environment.`,
+    )
   }
 }
 
