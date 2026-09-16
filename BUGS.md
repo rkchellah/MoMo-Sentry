@@ -5,7 +5,7 @@ This exists so anyone setting up the project doesn't waste time on the same prob
 
 ---
 
-## BUG-001 — pydantic-core build failure on Python 3.14
+## BUG-001 - pydantic-core build failure on Python 3.14
 
 **Date:** 2026-04-30  
 **File:** `backend/requirements.txt`  
@@ -15,7 +15,7 @@ error: linker `link.exe` not found
 Failed building wheel for pydantic-core
 ```
 **Cause:**  
-`pydantic==2.9.2` has no pre-built wheel for Python 3.14. pip fell back to compiling from source using Rust/maturin, which requires Visual C++ build tools (`link.exe`) — not installed on this machine.
+`pydantic==2.9.2` has no pre-built wheel for Python 3.14. pip fell back to compiling from source using Rust/maturin, which requires Visual C++ build tools (`link.exe`) - not installed on this machine.
 
 **Fix:**  
 Changed `pydantic==2.9.2` to `pydantic>=2.10.0`. Newer versions ship pre-built wheels for Python 3.14 so no Rust compilation is needed.
@@ -25,7 +25,7 @@ Pinning exact versions is good for production stability but breaks on newer Pyth
 
 ---
 
-## BUG-002 — pyiceberg build failure on Python 3.14
+## BUG-002 - pyiceberg build failure on Python 3.14
 
 **Date:** 2026-04-30  
 **File:** `backend/requirements.txt`  
@@ -35,10 +35,10 @@ error: Microsoft Visual C++ 14.0 or greater is required
 Failed building wheel for pyiceberg
 ```
 **Cause:**  
-`supabase>=2.7.4` resolved to `2.29.0` which introduced `pyiceberg` as a new dependency of `storage3`. pyiceberg requires C++ compilation on Python 3.14 — Visual C++ 14.0 not installed.
+`supabase>=2.7.4` resolved to `2.29.0` which introduced `pyiceberg` as a new dependency of `storage3`. pyiceberg requires C++ compilation on Python 3.14 - Visual C++ 14.0 not installed.
 
 **Fix:**  
-Pinned `supabase==2.7.4` — the version tested and confirmed to not pull in pyiceberg. Kept `pydantic>=2.10.0` flexible to avoid BUG-001 recurring.
+Pinned `supabase==2.7.4` - the version tested and confirmed to not pull in pyiceberg. Kept `pydantic>=2.10.0` flexible to avoid BUG-001 recurring.
 
 **Final requirements.txt that works on Python 3.14:**
 ```
@@ -56,7 +56,7 @@ Using `>=` on a fast-moving library like supabase lets pip resolve to a version 
 
 ---
 
-## BUG-003 — NameError: test_connectivity not defined
+## BUG-003 - NameError: test_connectivity not defined
 
 **Date:** 2026-04-30  
 **File:** `backend/test_api.py`  
@@ -65,7 +65,7 @@ Using `>=` on a fast-moving library like supabase lets pip resolve to a version 
 NameError: name 'test_connectivity' is not defined
 ```
 **Cause:**  
-Used a shell append command to add `test_connectivity` to the file. It landed after the `main()` function. Python reads top to bottom — `main()` referenced the function before Python had seen its definition.
+Used a shell append command to add `test_connectivity` to the file. It landed after the `main()` function. Python reads top to bottom - `main()` referenced the function before Python had seen its definition.
 
 **Fix:**  
 Rewrote the entire file cleanly with all test functions defined before `main()`.
@@ -75,7 +75,7 @@ Never append functions to a file that already has a `main()` at the bottom. Alwa
 
 ---
 
-## BUG-004 — Nokia NaC simulator returns 404/422 for some phone numbers on SIM Swap
+## BUG-004 - Nokia NaC simulator returns 404/422 for some phone numbers on SIM Swap
 
 **Date:** 2026-04-30  
 **File:** `backend/test_api.py`  
@@ -86,14 +86,14 @@ Numbers `+99999990400`, `+99999990404`, `+99999990422` all return 404 or 422 on 
 Nokia NaC simulator does not support all documented numbers for all APIs. The numbers listed as "device status" numbers in the portal don't work for SIM Swap specifically. No documentation explains which numbers work for which APIs.
 
 **Fix:**  
-Dropped the separate "flagged number" test entirely. The simulator returns `swapped: True` for all working numbers regardless — it confirms the endpoint is reachable and the response is correctly shaped. That is sufficient for prototype validation. In production with real network data, legitimate numbers would return `swapped: false`.
+Dropped the separate "flagged number" test entirely. The simulator returns `swapped: True` for all working numbers regardless - it confirms the endpoint is reachable and the response is correctly shaped. That is sufficient for prototype validation. In production with real network data, legitimate numbers would return `swapped: false`.
 
 **Lesson:**  
-Simulator behaviour does not always match documentation. Test against what actually responds, not what the docs imply should work. Don't waste time trying to find a number that returns a specific simulated value — the simulator is for endpoint validation, not scenario testing.
+Simulator behaviour does not always match documentation. Test against what actually responds, not what the docs imply should work. Don't waste time trying to find a number that returns a specific simulated value - the simulator is for endpoint validation, not scenario testing.
 
 ---
 
-## BUG-005 — Groq model decommissioned: llama3-groq-70b-8192-tool-use-preview
+## BUG-005 - Groq model decommissioned: llama3-groq-70b-8192-tool-use-preview
 
 **Date:** 2026-05-02  
 **File:** `backend/agent.py`  
@@ -113,11 +113,11 @@ Preview models get deprecated fast. Always use production model IDs, not preview
 
 ---
 
-## Open — not fixed yet
+## Open - not fixed yet
 
 These were confirmed in August 2026. Do not “fix” them by lying about Nokia’s response. Show CHECK FAILED or STOP as `risk.py` already does.
 
-### BUG-006 — STOP sandbox number returns 400 (open)
+### BUG-006 - STOP sandbox number returns 400 (open)
 
 **Date:** 2026-08-26  
 **Files:** `backend/camara.py`, till chips in `frontend/src/lib/sentryApi.ts`  
@@ -126,7 +126,7 @@ These were confirmed in August 2026. Do not “fix” them by lying about Nokia�
 **Not done:** No workaround that invents a STOP. No remap to another number. Wait for Nokia sandbox, or pick a number that actually 200s.  
 **Check:** From `backend/`, POST SIM Swap for `+99999991000` (200) vs `+99999990400` (400).
 
-### BUG-007 — SAFE sandbox number comes back swapped (open)
+### BUG-007 - SAFE sandbox number comes back swapped (open)
 
 **Date:** 2026-08-26  
 **Files:** `backend/risk.py`, `backend/test_api.py`  
@@ -134,7 +134,7 @@ These were confirmed in August 2026. Do not “fix” them by lying about Nokia�
 **Cause:** Current Nokia sandbox returns `{"swapped": true}` for valid numbers, including the “SAFE” ones. `risk.py` is correct: swapped → STOP.  
 **Not done:** Do not special-case `+99999991000` as SAFE. The chip is the intended story; the badge is the network.
 
-### BUG-008 — Live API health is degraded (open)
+### BUG-008 - Live API health is degraded (open)
 
 **Date:** 2026-08-26  
 **Host:** https://momo-sentry.onrender.com/health  
@@ -142,7 +142,7 @@ These were confirmed in August 2026. Do not “fix” them by lying about Nokia�
 **Cause:** Those keys are not set on the Render API service (or still placeholders). Local `http://localhost:8000/health` was `"ok"` with `"supabase": true`.  
 **Not done:** Add the keys in Render → momo-sentry → Environment, then redeploy. Frontend live URL is https://momo-sentry-1.onrender.com and must keep `NEXT_PUBLIC_MOMO_SENTRY_API=https://momo-sentry.onrender.com`. Local `.env.local` points at `http://localhost:8000`, so this does not break `npm run dev`.
 
-### BUG-009 — “Opening the till…” can hang (open)
+### BUG-009 - “Opening the till…” can hang (open)
 
 **Date:** 2026-08-26  
 **File:** `frontend/src/pages/agent.tsx`  
@@ -150,7 +150,7 @@ These were confirmed in August 2026. Do not “fix” them by lying about Nokia�
 **Cause:** `setTimeout(..., 3000)` is cleared when `getSession()` resolves with a session, then `loadAgent()` (Supabase `booth_agents` query) never returns. No timeout around `loadAgent`.  
 **Not done:** Race `loadAgent` with a timeout; still show login if the row is missing. Do not remove the loader without that.
 
-### BUG-010 — Viewport meta warning (open)
+### BUG-010 - Viewport meta warning (open)
 
 **Date:** 2026-08-26  
 **File:** `frontend/src/pages/_document.tsx`  
@@ -158,7 +158,7 @@ These were confirmed in August 2026. Do not “fix” them by lying about Nokia�
 **Cause:** `viewport` and apple-mobile-web-app tags live in `_document.tsx`. Next 15 wants viewport in `next/head` metadata on pages or `app`.  
 **Not done:** Move viewport to the Next 15 metadata API. PWA tags can stay; they are not the warning.
 
-### BUG-011 — Password reset needs Redirect URLs (ops, open)
+### BUG-011 - Password reset needs Redirect URLs (ops, open)
 
 **Date:** 2026-08-26  
 **Files:** `frontend/src/pages/reset.tsx`, login “Forgot password?”  

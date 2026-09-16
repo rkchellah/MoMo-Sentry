@@ -1,5 +1,5 @@
 """
-sessions.py — persist DeepSeek session memory per authenticated user.
+sessions.py - persist DeepSeek session memory per authenticated user.
 Falls back to process memory if Supabase is unavailable.
 """
 

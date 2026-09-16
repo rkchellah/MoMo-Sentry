@@ -5,7 +5,8 @@ import { supabase } from '../lib/supabase'
 import { Select } from '../components/Select'
 import { getBoothLocations } from '../lib/fraudService'
 import { BoothLocation } from '../types/sentry'
-import { AuthShell, AuthError, PasswordField, AuthField, AuthActions } from '../components/AuthShell'
+import { AuthShell, AuthError, AuthInput, PasswordField, AuthField, AuthActions, AuthForm } from '../components/AuthShell'
+import { Button } from '@/components/ui/button'
 
 export default function AgentRegisterPage() {
   const router = useRouter()
@@ -49,34 +50,44 @@ export default function AgentRegisterPage() {
   }
 
   return (
-    <AuthShell title="Create account — MoMo Sentry" heading="Create a MoMo Sentry account">
+    <AuthShell
+      title="Create account - MoMo Sentry"
+      heading="Create a till account."
+      lede="Booth agents only. Operations is a separate login."
+    >
       {error && <AuthError>{error}</AuthError>}
       <form onSubmit={handleSubmit}>
-        <AuthField label="Name">
-          <input className="auth-input" value={name} onChange={e => setName(e.target.value)} autoComplete="name" required />
-        </AuthField>
-        <AuthField label="Email">
-          <input className="auth-input" type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required />
-        </AuthField>
-        <AuthField label="Password">
-          <PasswordField value={password} onChange={setPassword} show={showPwd} onToggle={() => setShowPwd(v => !v)} autoComplete="new-password" />
-        </AuthField>
-        <AuthField label="Phone">
-          <input className="auth-input" type="tel" value={phone} onChange={e => setPhone(e.target.value)} autoComplete="tel" required />
-        </AuthField>
-        <AuthField label="Booth">
-          <Select
-            aria-label="Primary booth"
-            value={location}
-            onChange={setLocation}
-            options={boothLocations.map(l => ({ value: l.name, label: l.name }))}
-            placeholder="Select booth"
-          />
-        </AuthField>
+        <AuthForm>
+          <AuthField label="Name" htmlFor="reg-name">
+            <AuthInput id="reg-name" value={name} onChange={e => setName(e.target.value)} autoComplete="name" required />
+          </AuthField>
+          <AuthField label="Email" htmlFor="reg-email">
+            <AuthInput id="reg-email" type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required />
+          </AuthField>
+          <AuthField label="Password" htmlFor="reg-password">
+            <PasswordField id="reg-password" value={password} onChange={setPassword} show={showPwd} onToggle={() => setShowPwd(v => !v)} autoComplete="new-password" />
+          </AuthField>
+          <AuthField label="Phone" htmlFor="reg-phone">
+            <AuthInput id="reg-phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} autoComplete="tel" required />
+          </AuthField>
+          <AuthField label="Booth">
+            <Select
+              aria-label="Primary booth"
+              value={location}
+              onChange={setLocation}
+              options={boothLocations.map(l => ({ value: l.name, label: l.name }))}
+              placeholder="Select booth"
+            />
+          </AuthField>
+        </AuthForm>
         <AuthActions
           busy={loading}
           label="Continue"
-          aside={<Link href="/agent">Already have an account?</Link>}
+          aside={(
+            <Button asChild variant="link">
+              <Link href="/agent">Already have an account?</Link>
+            </Button>
+          )}
         />
       </form>
     </AuthShell>

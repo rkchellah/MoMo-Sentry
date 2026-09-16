@@ -1,4 +1,4 @@
--- MoMo Sentry — 001: fraud_checks table
+-- MoMo Sentry - 001: fraud_checks table
 -- Run first in the Supabase SQL editor, then 002, then 003.
 -- If this table already exists, skip this file.
 

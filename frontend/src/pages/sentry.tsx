@@ -8,9 +8,8 @@ import {
 } from '../types/sentry'
 import { getFraudChecks, getBoothLocations } from '../lib/fraudService'
 import { supabase } from '../lib/supabase'
-import { SandboxBanner } from '../components/SandboxBanner'
 import { ThemeToggle } from '../components/ThemeToggle'
-import { AuthShell, AuthError, PasswordField, AuthField, AuthActions } from '../components/AuthShell'
+import { AuthShell, AuthError, AuthInput, PasswordField, AuthField, AuthActions, AuthForm } from '../components/AuthShell'
 import { VerdictPill } from '../components/VerdictPill'
 import { Select } from '../components/Select'
 import { WhereView } from '../components/WhereView'
@@ -19,6 +18,24 @@ import {
   BrandLockup, IconArrow, IconInbox, IconPin, IconSearch, IconRefresh,
   IconList, IconMap, IconLoader, IconBan, IconCaution, IconFailed, IconShield, IconLogOut, IconUsers,
 } from '../components/icons'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Spinner } from '@/components/ui/spinner'
+import { cn } from '@/lib/utils'
 
 const LUSAKA_FALLBACK = { lat: -15.4166, lng: 28.2833 }
 
@@ -72,10 +89,14 @@ export default function SentryPage() {
   useEffect(() => {
     fetchOwnerNeeded()
       .then(needed => setOwnerNeeded(needed))
-      .catch(() => setOwnerNeeded(true))
+      .catch(() => setOwnerNeeded(null))
     confirmOwner().finally(() => setAuthLoading(false))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (!session) setOwnerOk(false)
+      if (!session) {
+        setOwnerOk(false)
+        return
+      }
+      void confirmOwner()
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -105,6 +126,25 @@ export default function SentryPage() {
   async function finishOwnerSession() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) throw new Error('Not authenticated')
+
+    // Returning owners only need Supabase. Don't block login on a down local API.
+    const { data: profile } = await supabase
+      .from('momo_profiles')
+      .select('role')
+      .eq('user_id', session.user.id)
+      .maybeSingle()
+
+    if (profile?.role === 'owner') {
+      setOwnerOk(true)
+      setOwnerNeeded(false)
+      return
+    }
+
+    if (profile && profile.role !== 'owner') {
+      throw new Error('This account is not an owner. Use the agent screen.')
+    }
+
+    // First-owner claim needs the FastAPI setup route.
     if (ownerNeeded !== false) {
       await claimFirstOwner(session.access_token)
       setOwnerNeeded(false)
@@ -273,40 +313,65 @@ export default function SentryPage() {
     const creating = authMode === 'create'
     return (
       <AuthShell
-        title={creating ? 'Create account — MoMo Sentry' : 'Log in — MoMo Sentry'}
-        heading={creating ? 'Create a MoMo Sentry account' : 'Log in to MoMo Sentry'}
+        title={creating ? 'Create account - MoMo Sentry' : 'Log in - MoMo Sentry'}
+        heading={creating ? 'Create an operations account.' : 'Log in to operations.'}
+        lede={creating
+          ? 'First owner on this project claims the queue. Agents use the booth till.'
+          : 'Queue of every booth check, plus the Lusaka map.'}
       >
         {loginError && <AuthError>{loginError}</AuthError>}
         <form onSubmit={creating ? handleCreateOwner : handleLogin}>
-          <AuthField label="Email">
-            <input className="auth-input" type="email" required value={loginEmail} onChange={e => setLoginEmail(e.target.value)} autoComplete="email" autoFocus />
-          </AuthField>
-          <AuthField label="Password">
-            <PasswordField
-              value={loginPassword}
-              onChange={setLoginPassword}
-              show={showPwd}
-              onToggle={() => setShowPwd(v => !v)}
-              autoComplete={creating ? 'new-password' : 'current-password'}
-            />
-          </AuthField>
+          <AuthForm>
+            <AuthField label="Email" htmlFor="ops-email">
+              <AuthInput
+                id="ops-email"
+                type="email"
+                required
+                value={loginEmail}
+                onChange={e => setLoginEmail(e.target.value)}
+                autoComplete="email"
+                autoFocus
+                placeholder="Your email"
+              />
+            </AuthField>
+            <AuthField label="Password" htmlFor="ops-password">
+              <PasswordField
+                id="ops-password"
+                value={loginPassword}
+                onChange={setLoginPassword}
+                show={showPwd}
+                onToggle={() => setShowPwd(v => !v)}
+                autoComplete={creating ? 'new-password' : 'current-password'}
+              />
+            </AuthField>
+          </AuthForm>
           {!creating && (
-            <p className="auth-forgot">
+            <Button asChild variant="link" className="h-auto self-start px-0">
               <Link href="/reset?next=/sentry">Forgot password?</Link>
-            </p>
+            </Button>
           )}
           <AuthActions
             busy={loginLoading}
             label={creating ? 'Continue' : 'Log in'}
             aside={
               creating
-                ? <button type="button" className="btn-link" onClick={() => setAuthMode('signin')}>Already have an account?</button>
+                ? (
+                  <Button type="button" variant="link" onClick={() => setAuthMode('signin')}>
+                    Already have an account?
+                  </Button>
+                )
                 : (
                   <>
                     {ownerNeeded !== false && (
-                      <button type="button" onClick={() => setAuthMode('create')}>Don&rsquo;t have an account?</button>
+                      <Button type="button" variant="link" onClick={() => setAuthMode('create')}>
+                        Don&rsquo;t have an account?
+                      </Button>
                     )}
-                    {ownerNeeded === false && <Link href="/agent">Booth till login</Link>}
+                    {ownerNeeded === false && (
+                      <Button asChild variant="link">
+                        <Link href="/agent">Booth till login</Link>
+                      </Button>
+                    )}
                   </>
                 )
             }
@@ -317,211 +382,311 @@ export default function SentryPage() {
   }
 
   return (
-    <div className="app-shell">
-      <Head><title>Operations — MoMo Sentry</title></Head>
-      <SandboxBanner />
-      <header className="app-bar">
-        <BrandLockup />
-        <div className="tabs">
-          <button type="button" className={`tab${tab === 'queue' ? ' is-on' : ''}`} onClick={() => setTab('queue')}>
-            <IconList size={14} /> Queue
-          </button>
-          <button type="button" className={`tab${tab === 'where' ? ' is-on' : ''}`} onClick={() => setTab('where')}>
-            <IconMap size={14} /> Where
-          </button>
-        </div>
-        <form onSubmit={handleCheck} className="bar-form">
-          {SANDBOX_CUSTOMERS.slice(0, 3).map(c => (
-            <button key={c.phone} type="button" className={`chip${checkPhone === c.phone ? ' is-on' : ''}`} onClick={() => setCheckPhone(c.phone)} title={c.hint}>{c.label}</button>
-          ))}
-          <input className="field-input mono" value={checkPhone} onChange={e => setCheckPhone(e.target.value)} placeholder="+999…" required
-            style={{ width: 150, height: 38 }} />
-          <Select
-            aria-label="Booth"
-            value={checkLocation}
-            onChange={setCheckLocation}
-            options={boothLocations.map(l => ({ value: l.name, label: l.name }))}
-            placeholder="Booth"
-            className="select-bar"
-            style={{ width: 180 }}
-          />
-          <button type="submit" className="btn btn-sm" disabled={checking}>
-            {checking ? <IconLoader /> : <>Check <IconArrow /></>}
-          </button>
-          <Link href="/agent" className="btn-link">Agent</Link>
-          <ThemeToggle />
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => { supabase.auth.signOut(); setOwnerOk(false) }}>
-            <IconLogOut size={14} /> Sign out
-          </button>
-        </form>
-      </header>
-      {checkError && (
-        <div style={{ padding: '10px 20px 0', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
-          <AuthError>{checkError}</AuthError>
-        </div>
-      )}
+    <div className="flex min-h-dvh flex-col bg-background">
+      <Head><title>Operations - MoMo Sentry</title></Head>
+      <Tabs value={tab} onValueChange={v => setTab(v as 'queue' | 'where')} className="flex min-h-dvh flex-col">
+        <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
+          <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-2 px-4 py-2.5">
+            <Link href="/" className="mr-1 shrink-0">
+              <BrandLockup />
+            </Link>
 
-      {tab === 'queue' && (
-        <div className="page">
-          <div className="page-head">
-            <div>
-              <h1 className="page-title">Operations queue</h1>
-              <p className="page-sub">Every booth check, newest first · refreshes every 30s</p>
-            </div>
-            <div className="toolbar">
-              {fetchedAt && (
-                <span className="hint" style={{ margin: 0 }}>Updated {formatCheckTime(fetchedAt)}</span>
-              )}
-              <button type="button" className="icon-btn" title="Refresh now" onClick={loadChecks}>
-                <IconRefresh />
-              </button>
-            </div>
-          </div>
+            <TabsList className="h-9">
+              <TabsTrigger value="queue" className="gap-1.5 px-3">
+                <IconList data-icon="inline-start" />
+                Queue
+              </TabsTrigger>
+              <TabsTrigger value="where" className="gap-1.5 px-3">
+                <IconMap data-icon="inline-start" />
+                Where
+              </TabsTrigger>
+            </TabsList>
 
-          <div className="metrics">
-            {METRIC_CARDS.map((m, i) => (
-              <button
-                key={m.label}
-                type="button"
-                className={`metric${m.tone}${m.filter && verdictFilter === m.filter ? ' is-on' : ''}`}
-                style={{ animationDelay: `${i * 40}ms`, textAlign: 'left', cursor: 'pointer' }}
-                onClick={() => setVerdictFilter(verdictFilter === m.filter ? '' : m.filter)}
-                title={m.filter ? `Filter to ${m.label.toLowerCase()}` : 'Clear the filter'}
-              >
-                <span className="metric-top">
-                  <span className="metric-label">{m.label}</span>
-                  <m.icon size={16} />
-                </span>
-                <span className="metric-value">
-                  {checksLoading
-                    ? <span className="skel" style={{ display: 'block', width: 44, height: 24, marginTop: 4 }} />
-                    : m.value(stats, neverChecked.length)}
-                </span>
-                <span className="metric-foot">
-                  <span>{m.foot}</span>
-                  {m.filter && verdictFilter === m.filter && <span className="count-badge">on</span>}
-                </span>
-              </button>
-            ))}
-          </div>
+            <Separator orientation="vertical" className="mx-1 hidden h-6 sm:block" />
 
-          <section className="panel">
-            <div className="panel-head">
-              <span className="panel-title">Flags</span>
-              <span className="count-badge">{filtered.length}</span>
-              <div className="toolbar">
-                <VerdictFilters value={verdictFilter} onChange={setVerdictFilter} />
-                <label className="search">
-                  <IconSearch />
-                  <input
-                    className="field-input"
-                    value={query}
-                    onChange={e => setQuery(e.target.value)}
-                    placeholder="Search number, agent, booth…"
-                  />
-                </label>
-              </div>
-            </div>
-            <div className="table-scroll">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Time</th><th>Number</th><th>Verdict</th><th>Agent</th><th>Booth</th><th>Narration</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {checksLoading && [0, 1, 2, 3].map(i => (
-                    <tr key={`skel-${i}`}>
-                      {[92, 118, 64, 96, 104, 220].map((w, j) => (
-                        <td key={j}><span className="skel" style={{ display: 'block', width: w }} /></td>
-                      ))}
-                    </tr>
-                  ))}
-                  {!checksLoading && filtered.map(row => (
-                    <tr key={row.id} className={selectedCheckId === row.id ? 'is-on' : undefined} onClick={() => openCheckOnMap(row)}>
-                      <td style={{ whiteSpace: 'nowrap', color: 'var(--mute)' }}>{formatCheckTime(row.checked_at)}</td>
-                      <td className="mono">{row.phone_number}</td>
-                      <td><VerdictPill verdict={row.verdict} /></td>
-                      <td>
-                        <span className="who">
-                          <span className="who-mark">{initialsOf(displayAgentName(row.agent_name))}</span>
-                          <span className="who-name">{displayAgentName(row.agent_name)}</span>
+            <form onSubmit={handleCheck} className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" size="sm">
+                    Samples
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>Simulator numbers</DropdownMenuLabel>
+                    {SANDBOX_CUSTOMERS.map(c => (
+                      <DropdownMenuItem
+                        key={c.phone}
+                        onSelect={() => setCheckPhone(c.phone)}
+                      >
+                        <span className="flex flex-col gap-0.5">
+                          <span>{c.label}</span>
+                          <span className="font-mono text-xs text-muted-foreground">{c.phone}</span>
                         </span>
-                      </td>
-                      <td style={{ color: 'var(--ink-2)' }}>{row.agent_location}</td>
-                      <td className="narration">{row.narration}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Input
+                className="w-[10.5rem] font-mono"
+                value={checkPhone}
+                onChange={e => setCheckPhone(e.target.value)}
+                placeholder="+999…"
+                required
+                aria-label="Customer number"
+              />
+              <Select
+                aria-label="Booth"
+                value={checkLocation}
+                onChange={setCheckLocation}
+                options={boothLocations.map(l => ({ value: l.name, label: l.name }))}
+                placeholder="Booth"
+                className="w-[10.5rem]"
+              />
+              <Button type="submit" size="sm" disabled={checking}>
+                {checking ? <Spinner data-icon="inline-start" /> : null}
+                {checking ? 'Checking…' : 'Check'}
+                {!checking ? <IconArrow data-icon="inline-end" /> : null}
+              </Button>
+            </form>
+
+            <div className="ml-auto flex items-center gap-1">
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/agent">Agent</Link>
+              </Button>
+              <ThemeToggle />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => { supabase.auth.signOut(); setOwnerOk(false) }}
+              >
+                <IconLogOut data-icon="inline-start" />
+                Sign out
+              </Button>
             </div>
-            {!checksLoading && filtered.length === 0 && (
-              <div className="empty">
-                <div className="empty-icon"><IconInbox /></div>
-                {query || verdictFilter
-                  ? 'No check matches this filter.'
-                  : 'No checks yet. Run a simulator number from the bar.'}
-              </div>
-            )}
-            {!checksLoading && filtered.length > 0 && (
-              <div className="panel-foot">
-                {filtered.length === checks.length
-                  ? `All ${checks.length} ${checks.length === 1 ? 'check' : 'checks'} shown.`
-                  : `${filtered.length} of ${checks.length} checks shown.`}
-              </div>
-            )}
-          </section>
-
-          <div className="split">
-            <section className="panel">
-              <div className="panel-head">
-                <span className="panel-title">Repeat numbers</span>
-                <span className="count-badge">{repeats.length}</span>
-              </div>
-              {repeats.length === 0 && <div className="empty">No number has been checked twice.</div>}
-              {repeats.map(([phone, n]) => (
-                <div key={phone} className="list-row">
-                  <span className="mono">{phone}</span>
-                  <span className="meta">{n} checks</span>
-                </div>
-              ))}
-            </section>
-            <section className="panel">
-              <div className="panel-head">
-                <span className="panel-title">Agents with zero checks</span>
-                <span className="count-badge">{neverChecked.length}</span>
-              </div>
-              {neverChecked.length === 0 && <div className="empty">Every registered agent has checked.</div>}
-              {neverChecked.map(a => (
-                <div key={a.id} className="list-row">
-                  <span className="who">
-                    <span className="who-mark">{initialsOf(a.name)}</span>
-                    <span className="who-name">{a.name}</span>
-                  </span>
-                  <span className="meta"><IconPin /> {a.primary_location}</span>
-                </div>
-              ))}
-            </section>
           </div>
-        </div>
-      )}
+        </header>
 
-      {tab === 'where' && (
-        <WhereView
-          points={points}
-          checks={checks}
-          basemap={basemap}
-          onBasemap={setBasemap}
-          verdictFilter={verdictFilter}
-          onVerdictFilter={setVerdictFilter}
-          focusPointId={focusPointId}
-          onFocusPoint={focusPoint}
-          selectedCheckId={selectedCheckId}
-          queueRows={filtered.length}
-          onOpenQueue={() => setTab('queue')}
-          filters={<VerdictFilters value={verdictFilter} onChange={setVerdictFilter} />}
-        />
-      )}
+        {checkError && (
+          <div className="mx-auto w-full max-w-[1400px] px-4 pt-3">
+            <AuthError>{checkError}</AuthError>
+          </div>
+        )}
+
+        <TabsContent value="queue" className="mt-0 flex-1">
+          <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 px-4 py-6">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h1 className="text-2xl font-normal tracking-tight">Operations queue</h1>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Every booth check, newest first · refreshes every 30s
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {fetchedAt && (
+                  <span className="text-xs text-muted-foreground">Updated {formatCheckTime(fetchedAt)}</span>
+                )}
+                <Button type="button" variant="outline" size="icon-sm" title="Refresh now" onClick={loadChecks}>
+                  <IconRefresh />
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {METRIC_CARDS.map(m => {
+                const active = Boolean(m.filter && verdictFilter === m.filter)
+                return (
+                  <Card
+                    key={m.label}
+                    size="sm"
+                    role="button"
+                    tabIndex={0}
+                    className={cn(
+                      'cursor-pointer transition hover:bg-muted/40',
+                      active && 'ring-2 ring-ring',
+                      m.tone === 'is-stop' && 'border-destructive/30',
+                      m.tone === 'is-caution' && 'border-warning/40',
+                    )}
+                    onClick={() => setVerdictFilter(verdictFilter === m.filter ? '' : m.filter)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        setVerdictFilter(verdictFilter === m.filter ? '' : m.filter)
+                      }
+                    }}
+                    title={m.filter ? `Filter to ${m.label.toLowerCase()}` : 'Clear the filter'}
+                  >
+                    <CardHeader className="flex flex-row items-center justify-between gap-2">
+                      <CardDescription>{m.label}</CardDescription>
+                      <m.icon className="size-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-2xl font-normal tracking-tight">
+                        {checksLoading ? '-' : m.value(stats, neverChecked.length)}
+                      </p>
+                      <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>{m.foot}</span>
+                        {active && <Badge variant="secondary">on</Badge>}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+
+            <Card>
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <CardTitle>Flags</CardTitle>
+                  <Badge variant="secondary">{filtered.length}</Badge>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <VerdictFilters value={verdictFilter} onChange={setVerdictFilter} />
+                  <div className="relative min-w-[220px] flex-1">
+                    <IconSearch className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      className="pl-8"
+                      value={query}
+                      onChange={e => setQuery(e.target.value)}
+                      placeholder="Search number, agent, booth…"
+                    />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="px-0">
+                <ScrollArea className="h-[min(420px,50vh)] w-full">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-y border-border text-left text-xs text-muted-foreground">
+                        <th className="px-4 py-2 font-normal">Time</th>
+                        <th className="px-4 py-2 font-normal">Number</th>
+                        <th className="px-4 py-2 font-normal">Verdict</th>
+                        <th className="px-4 py-2 font-normal">Agent</th>
+                        <th className="px-4 py-2 font-normal">Booth</th>
+                        <th className="px-4 py-2 font-normal">Narration</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {checksLoading && [0, 1, 2, 3].map(i => (
+                        <tr key={`skel-${i}`} className="border-b border-border">
+                          {[92, 118, 64, 96, 104, 220].map((w, j) => (
+                            <td key={j} className="px-4 py-3">
+                              <span className="block h-4 animate-pulse rounded bg-muted" style={{ width: w }} />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                      {!checksLoading && filtered.map(row => (
+                        <tr
+                          key={row.id}
+                          className={cn(
+                            'cursor-pointer border-b border-border hover:bg-muted/40',
+                            selectedCheckId === row.id && 'bg-muted',
+                          )}
+                          onClick={() => openCheckOnMap(row)}
+                        >
+                          <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{formatCheckTime(row.checked_at)}</td>
+                          <td className="px-4 py-3 font-mono text-xs">{row.phone_number}</td>
+                          <td className="px-4 py-3"><VerdictPill verdict={row.verdict} /></td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center gap-2">
+                              <span className="flex size-7 items-center justify-center rounded-full bg-muted text-[10px] font-normal">
+                                {initialsOf(displayAgentName(row.agent_name))}
+                              </span>
+                              <span>{displayAgentName(row.agent_name)}</span>
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">{row.agent_location}</td>
+                          <td className="max-w-sm truncate px-4 py-3 text-muted-foreground">{row.narration}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </ScrollArea>
+                {!checksLoading && filtered.length === 0 && (
+                  <div className="flex flex-col items-center gap-2 px-4 py-10 text-sm text-muted-foreground">
+                    <IconInbox className="size-5" />
+                    {query || verdictFilter
+                      ? 'No check matches this filter.'
+                      : 'No checks yet. Run a simulator number from the bar.'}
+                  </div>
+                )}
+              </CardContent>
+              {!checksLoading && filtered.length > 0 && (
+                <CardFooter className="text-xs text-muted-foreground">
+                  {filtered.length === checks.length
+                    ? `All ${checks.length} ${checks.length === 1 ? 'check' : 'checks'} shown.`
+                    : `${filtered.length} of ${checks.length} checks shown.`}
+                </CardFooter>
+              )}
+            </Card>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card>
+                <CardHeader className="flex flex-row items-center gap-2">
+                  <CardTitle>Repeat numbers</CardTitle>
+                  <Badge variant="secondary">{repeats.length}</Badge>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2">
+                  {repeats.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No number has been checked twice.</p>
+                  )}
+                  {repeats.map(([phone, n]) => (
+                    <div key={phone} className="flex items-center justify-between gap-3 border-b border-border py-2 last:border-0">
+                      <span className="font-mono text-xs">{phone}</span>
+                      <span className="text-xs text-muted-foreground">{n} checks</span>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center gap-2">
+                  <CardTitle>Agents with zero checks</CardTitle>
+                  <Badge variant="secondary">{neverChecked.length}</Badge>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2">
+                  {neverChecked.length === 0 && (
+                    <p className="text-sm text-muted-foreground">Every registered agent has checked.</p>
+                  )}
+                  {neverChecked.map(a => (
+                    <div key={a.id} className="flex items-center justify-between gap-3 border-b border-border py-2 last:border-0">
+                      <span className="inline-flex items-center gap-2">
+                        <span className="flex size-7 items-center justify-center rounded-full bg-muted text-[10px] font-normal">
+                          {initialsOf(a.name)}
+                        </span>
+                        <span className="text-sm">{a.name}</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <IconPin className="size-3.5" /> {a.primary_location}
+                      </span>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="where" className="mt-0 flex-1">
+          <WhereView
+            points={points}
+            checks={checks}
+            basemap={basemap}
+            onBasemap={setBasemap}
+            verdictFilter={verdictFilter}
+            onVerdictFilter={setVerdictFilter}
+            focusPointId={focusPointId}
+            onFocusPoint={focusPoint}
+            selectedCheckId={selectedCheckId}
+            queueRows={filtered.length}
+            onOpenQueue={() => setTab('queue')}
+            filters={<VerdictFilters value={verdictFilter} onChange={setVerdictFilter} />}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
@@ -541,32 +706,44 @@ const METRIC_CARDS: {
   icon: typeof IconShield
   value: (stats: FraudStats, neverChecked: number) => number
 }[] = [
-  { label: 'Checks', foot: 'all time', tone: ' is-quiet', filter: '', icon: IconShield, value: s => s.total },
-  { label: 'Stop', foot: 'do not pay', tone: ' is-stop', filter: 'STOP', icon: IconBan, value: s => s.stop },
-  { label: 'Caution', foot: 'ask a question', tone: ' is-caution', filter: 'CAUTION', icon: IconCaution, value: s => s.caution },
+  { label: 'Checks', foot: 'all time', tone: 'is-quiet', filter: '', icon: IconShield, value: s => s.total },
+  { label: 'Stop', foot: 'do not pay', tone: 'is-stop', filter: 'STOP', icon: IconBan, value: s => s.stop },
+  { label: 'Caution', foot: 'ask a question', tone: 'is-caution', filter: 'CAUTION', icon: IconCaution, value: s => s.caution },
   { label: 'Failed', foot: 'network error', tone: '', filter: 'CHECK_FAILED', icon: IconFailed, value: s => s.failed },
-  { label: 'Never checked', foot: 'registered agents', tone: ' is-quiet', filter: '', icon: IconUsers, value: (_s, n) => n },
+  { label: 'Never checked', foot: 'registered agents', tone: 'is-quiet', filter: '', icon: IconUsers, value: (_s, n) => n },
 ]
 
-const FILTER_TONE: Record<string, string> = {
-  STOP: ' chip-stop',
-  CAUTION: ' chip-caution',
-  SAFE: ' chip-safe',
-}
-
 function VerdictFilters({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const options = [
+    { value: 'all', label: 'All' },
+    { value: 'STOP', label: 'Stop' },
+    { value: 'CAUTION', label: 'Caution' },
+    { value: 'CHECK_FAILED', label: 'Failed' },
+    { value: 'SAFE', label: 'Safe' },
+  ] as const
+
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-      {['', 'STOP', 'CAUTION', 'CHECK_FAILED', 'SAFE'].map(v => (
-        <button
-          key={v || 'all'}
-          type="button"
-          className={`chip${FILTER_TONE[v] ?? ''}${value === v ? ' is-on' : ''}`}
-          onClick={() => onChange(v)}
+    <ToggleGroup
+      type="single"
+      variant="outline"
+      size="sm"
+      spacing={1}
+      value={value || 'all'}
+      onValueChange={next => {
+        if (!next) return
+        onChange(next === 'all' ? '' : next)
+      }}
+      className="flex w-max flex-nowrap items-center gap-1"
+    >
+      {options.map(opt => (
+        <ToggleGroupItem
+          key={opt.value}
+          value={opt.value}
+          className="h-8 shrink-0 rounded-full px-2.5 text-xs font-normal capitalize"
         >
-          {v === 'CHECK_FAILED' ? 'Failed' : (v || 'All')}
-        </button>
+          {opt.label}
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   )
 }

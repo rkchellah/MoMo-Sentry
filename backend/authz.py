@@ -1,5 +1,5 @@
 """
-authz.py — verify Supabase JWTs and load MoMo roles.
+authz.py - verify Supabase JWTs and load MoMo roles.
 """
 
 from __future__ import annotations

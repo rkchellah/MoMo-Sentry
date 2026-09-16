@@ -1,4 +1,4 @@
--- MoMo Sentry — confirm 001 + 002 + 003 are live
+-- MoMo Sentry - confirm 001 + 002 + 003 are live
 -- READ ONLY. Paste in the Supabase SQL editor. One result table.
 
 select * from (

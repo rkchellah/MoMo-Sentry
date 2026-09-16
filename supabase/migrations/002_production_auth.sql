@@ -1,4 +1,4 @@
--- MoMo Sentry — production auth, roles, sessions, CHECK_FAILED
+-- MoMo Sentry - production auth, roles, sessions, CHECK_FAILED
 -- Run in the Supabase SQL editor after 001_fraud_checks.sql
 
 alter table fraud_checks add column if not exists agent_id text;
@@ -37,7 +37,7 @@ alter table fraud_checks enable row level security;
 -- PAR-Map leftover /sentry still lists those tables as any authenticated user.
 
 -- Keep "Authenticated users can read checks" until PAR-Map leftover /sentry
--- is retired. Postgres ORs SELECT policies — adding owner/agent rules does
+-- is retired. Postgres ORs SELECT policies - adding owner/agent rules does
 -- not hide rows from existing PAR-Map sessions.
 
 drop policy if exists "Owners read all checks" on fraud_checks;

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import { supabase } from '../lib/supabase'
-import { AuthShell, AuthError, AuthNotice, AuthField, AuthActions, PasswordField } from '../components/AuthShell'
+import { AuthShell, AuthError, AuthNotice, AuthField, AuthActions, AuthInput, PasswordField, AuthForm } from '../components/AuthShell'
+import { Button } from '@/components/ui/button'
 
 function nextPath(raw: string | string[] | undefined): string {
   const value = Array.isArray(raw) ? raw[0] : raw
@@ -61,22 +62,29 @@ export default function ResetPage() {
 
   if (mode === 'set') {
     return (
-      <AuthShell title="New password — MoMo Sentry" heading="Choose a new password">
+      <AuthShell title="New password - MoMo Sentry" heading="Choose a new password." lede="Then you will land back on the screen you came from.">
         {error && <AuthError>{error}</AuthError>}
         <form onSubmit={savePassword}>
-          <AuthField label="Password">
-            <PasswordField
-              value={password}
-              onChange={setPassword}
-              show={showPwd}
-              onToggle={() => setShowPwd(v => !v)}
-              autoComplete="new-password"
-            />
-          </AuthField>
+          <AuthForm>
+            <AuthField label="Password" htmlFor="new-password">
+              <PasswordField
+                id="new-password"
+                value={password}
+                onChange={setPassword}
+                show={showPwd}
+                onToggle={() => setShowPwd(v => !v)}
+                autoComplete="new-password"
+              />
+            </AuthField>
+          </AuthForm>
           <AuthActions
             busy={busy}
             label="Save password"
-            aside={<Link href={next}>Back to log in</Link>}
+            aside={(
+              <Button asChild variant="link">
+                <Link href={next}>Back to log in</Link>
+              </Button>
+            )}
           />
         </form>
       </AuthShell>
@@ -84,7 +92,7 @@ export default function ResetPage() {
   }
 
   return (
-    <AuthShell title="Reset password — MoMo Sentry" heading="Reset your password">
+    <AuthShell title="Reset password - MoMo Sentry" heading="Reset your password." lede="We send a link to the email on the account.">
       {error && <AuthError>{error}</AuthError>}
       {sent && (
         <AuthNotice>
@@ -92,21 +100,27 @@ export default function ResetPage() {
         </AuthNotice>
       )}
       <form onSubmit={sendLink}>
-        <AuthField label="Email">
-          <input
-            className="auth-input"
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            autoComplete="email"
-            required
-            autoFocus
-          />
-        </AuthField>
+        <AuthForm>
+          <AuthField label="Email" htmlFor="reset-email">
+            <AuthInput
+              id="reset-email"
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              autoComplete="email"
+              required
+              autoFocus
+            />
+          </AuthField>
+        </AuthForm>
         <AuthActions
           busy={busy}
           label="Send link"
-          aside={<Link href={next}>Back to log in</Link>}
+          aside={(
+            <Button asChild variant="link">
+              <Link href={next}>Back to log in</Link>
+            </Button>
+          )}
         />
       </form>
     </AuthShell>

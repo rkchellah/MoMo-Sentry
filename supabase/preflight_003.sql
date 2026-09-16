@@ -1,4 +1,4 @@
--- MoMo Sentry — preflight for 003_rls_lockdown.sql
+-- MoMo Sentry - preflight for 003_rls_lockdown.sql
 --
 -- READ ONLY. Nothing here writes, drops or alters anything. Run it in the
 -- Supabase SQL editor with 001 + 002 already applied, and read every row
@@ -80,7 +80,7 @@ select * from (
   union all
 
   -- 8. Every policy currently on the MoMo tables.
-  -- Expect to see "Authenticated users can read checks" on fraud_checks —
+  -- Expect to see "Authenticated users can read checks" on fraud_checks -
   -- that is the leak 003 drops. If it is already gone, 003's drop is a no-op
   -- and someone has been here before you.
   select 8, 'policy on ' || tablename, policyname || '  [' || cmd || ']'

@@ -2,14 +2,18 @@ import { useState, useEffect } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { supabase } from '../lib/supabase'
-import { IconArrow, IconLoader, IconLogOut } from '../components/icons'
+import { IconArrow, IconLoader, IconLogOut, BrandLockup } from '../components/icons'
 import { Select } from '../components/Select'
 import { getBoothLocations } from '../lib/fraudService'
 import { BoothLocation, Verdict } from '../types/sentry'
 import { ThemeToggle } from '../components/ThemeToggle'
-import { AuthShell, AuthError, PasswordField, AuthField, AuthActions } from '../components/AuthShell'
+import { AuthShell, AuthError, AuthInput, PasswordField, AuthField, AuthActions, AuthForm } from '../components/AuthShell'
 import { SANDBOX_CUSTOMERS, postCheck } from '../lib/sentryApi'
 import { VerdictPill, verdictLabel } from '../components/VerdictPill'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent } from '@/components/ui/card'
 
 interface BoothAgent {
   id: string
@@ -18,7 +22,6 @@ interface BoothAgent {
   primary_location: string
 }
 
-/** Short chip labels so the till reads as a control, not a form. */
 function chipShort(label: string): string {
   if (label.startsWith('SAFE (alt)')) return 'Safe 2'
   if (label.startsWith('SAFE')) return 'Safe'
@@ -28,11 +31,10 @@ function chipShort(label: string): string {
   return label
 }
 
-function chipTone(label: string): string {
-  if (label.startsWith('STOP')) return ' chip-stop'
-  if (label.startsWith('CAUTION')) return ' chip-caution'
-  if (label.startsWith('SAFE')) return ' chip-safe'
-  return ''
+function chipVariant(label: string): 'destructive' | 'outline' | 'secondary' {
+  if (label.startsWith('STOP')) return 'destructive'
+  if (label.startsWith('CAUTION')) return 'secondary'
+  return 'outline'
 }
 
 export default function AgentPage() {
@@ -127,10 +129,10 @@ export default function AgentPage() {
 
   if (authLoading) {
     return (
-      <div className="page-loader">
-        <div>
+      <div className="flex min-h-dvh items-center justify-center bg-muted/40">
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
           <IconLoader size={20} />
-          <p className="hint" style={{ textAlign: 'center' }}>Opening the till…</p>
+          <p className="text-sm">Opening the till…</p>
         </div>
       </div>
     )
@@ -138,36 +140,48 @@ export default function AgentPage() {
 
   if (!agent) {
     return (
-      <AuthShell title="Log in — MoMo Sentry" heading="Log in to MoMo Sentry">
+      <AuthShell
+        title="Log in - MoMo Sentry"
+        heading="Log in to the till."
+        lede="Check a customer number before you pay out."
+      >
         {loginError && <AuthError>{loginError}</AuthError>}
         <form onSubmit={handleLogin}>
-          <AuthField label="Email">
-            <input
-              className="auth-input"
-              type="email"
-              value={loginEmail}
-              onChange={e => setLoginEmail(e.target.value)}
-              autoComplete="email"
-              required
-              autoFocus
-            />
-          </AuthField>
-          <AuthField label="Password">
-            <PasswordField
-              value={loginPassword}
-              onChange={setLoginPassword}
-              show={showPwd}
-              onToggle={() => setShowPwd(v => !v)}
-              autoComplete="current-password"
-            />
-          </AuthField>
-          <p className="auth-forgot">
+          <AuthForm>
+            <AuthField label="Email" htmlFor="agent-email">
+              <AuthInput
+                id="agent-email"
+                type="email"
+                value={loginEmail}
+                onChange={e => setLoginEmail(e.target.value)}
+                placeholder="Your email"
+                autoComplete="email"
+                required
+                autoFocus
+              />
+            </AuthField>
+            <AuthField label="Password" htmlFor="agent-password">
+              <PasswordField
+                id="agent-password"
+                value={loginPassword}
+                onChange={setLoginPassword}
+                show={showPwd}
+                onToggle={() => setShowPwd(v => !v)}
+                autoComplete="current-password"
+              />
+            </AuthField>
+          </AuthForm>
+          <Button asChild variant="link" className="h-auto self-start px-0">
             <Link href="/reset?next=/agent">Forgot password?</Link>
-          </p>
+          </Button>
           <AuthActions
             busy={loginLoading}
             label="Log in"
-            aside={<Link href="/agent-register">Don&rsquo;t have an account?</Link>}
+            aside={(
+              <Button asChild variant="link">
+                <Link href="/agent-register">Don&rsquo;t have an account?</Link>
+              </Button>
+            )}
           />
         </form>
       </AuthShell>
@@ -176,98 +190,102 @@ export default function AgentPage() {
 
   return (
     <>
-      <Head><title>Booth check — MoMo Sentry</title></Head>
-      <div className="till-stage">
-        <div className="till-device">
-          <div className="till-app">
-            <header className="till-nav">
+      <Head><title>Booth check - MoMo Sentry</title></Head>
+      <div className="min-h-dvh bg-muted/40 px-4 py-6 sm:px-6">
+        <Card className="mx-auto flex min-h-[calc(100dvh-3rem)] max-w-md flex-col overflow-hidden">
+          <header className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+            <div className="min-w-0">
+              <BrandLockup />
+              <h1 className="mt-2 text-lg font-normal tracking-tight">Number check</h1>
+            </div>
+            <ThemeToggle />
+          </header>
+
+          <form className="flex flex-1 flex-col" onSubmit={handleCheck}>
+            <CardContent className="flex flex-1 flex-col gap-4 py-5">
               <div>
-                <div className="till-screen-kicker">MoMo Sentry</div>
-                <h1 className="till-screen-title">Number check</h1>
+                <p className="text-sm font-normal">{agent.name}</p>
+                <p className="text-xs text-muted-foreground">{agent.primary_location}</p>
               </div>
-              <div className="till-tools">
-                <ThemeToggle />
-              </div>
-            </header>
 
-            <form className="till-form" onSubmit={handleCheck}>
-              <div className="till-body">
-                <p className="till-hello">{agent.name}</p>
-                <p className="till-place">{agent.primary_location}</p>
+              <section className="rounded-xl border border-border bg-muted/40 p-4">
+                <Label htmlFor="customer-number" className="mb-1.5">Customer number</Label>
+                <Input
+                  id="customer-number"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  value={checkPhone}
+                  onChange={e => setCheckPhone(e.target.value)}
+                  placeholder="+99999991000"
+                  required
+                  className="font-mono"
+                />
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {SANDBOX_CUSTOMERS.map(c => (
+                    <Button
+                      key={c.phone}
+                      type="button"
+                      size="xs"
+                      variant={checkPhone === c.phone ? 'default' : chipVariant(c.label)}
+                      onClick={() => setCheckPhone(c.phone)}
+                      title={c.label}
+                    >
+                      {chipShort(c.label)}
+                    </Button>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Simulator only. SAFE is no swap in 72 hours - not that the person is legitimate.
+                </p>
+              </section>
 
-                <section className="till-card">
-                  <label className="till-phone-label" htmlFor="customer-number">Customer number</label>
-                  <input
-                    id="customer-number"
-                    className="till-phone"
-                    type="tel"
-                    inputMode="tel"
-                    autoComplete="tel"
-                    value={checkPhone}
-                    onChange={e => setCheckPhone(e.target.value)}
-                    placeholder="+99999991000"
-                    required
-                  />
-                  <div className="till-seg">
-                    {SANDBOX_CUSTOMERS.map(c => (
-                      <button
-                        key={c.phone}
-                        type="button"
-                        className={`chip${chipTone(c.label)}${checkPhone === c.phone ? ' is-on' : ''}`}
-                        onClick={() => setCheckPhone(c.phone)}
-                        title={c.label}
-                      >
-                        {chipShort(c.label)}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="hint till-hint">Simulator only. SAFE is no swap in 72 hours — not that the person is legitimate.</p>
-                </section>
+              <section>
+                <Label className="mb-1.5">Booth</Label>
+                <Select
+                  aria-label="Booth"
+                  value={checkLocation}
+                  onChange={setCheckLocation}
+                  options={boothLocations.map(l => ({ value: l.name, label: l.name }))}
+                  placeholder="Select booth"
+                />
+              </section>
 
-                <section className="till-card till-card-row">
-                  <div>
-                    <label className="field-label">Booth</label>
-                    <Select
-                      aria-label="Booth"
-                      value={checkLocation}
-                      onChange={setCheckLocation}
-                      options={boothLocations.map(l => ({ value: l.name, label: l.name }))}
-                      placeholder="Select booth"
-                    />
-                  </div>
-                </section>
+              {checkError && <AuthError>{checkError}</AuthError>}
 
-                {checkError && <div className="till-alert"><AuthError>{checkError}</AuthError></div>}
-
-                {result && (
-                  <div className={`result is-${result.verdict}`}>
-                    <div className="result-head">
-                      <span className="metric-label">Last check</span>
+              {result && (
+                <Card size="sm">
+                  <CardContent className="flex flex-col gap-3 pt-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-normal uppercase text-muted-foreground">Last check</span>
                       <VerdictPill verdict={result.verdict as Verdict} />
                     </div>
-                    <p className="result-body">{result.narration}</p>
-                    <p className="mono hint" style={{ marginTop: 12 }}>{result.phone_number} · {verdictLabel(result.verdict)}</p>
-                  </div>
-                )}
-              </div>
+                    <p className="text-sm">{result.narration}</p>
+                    <p className="font-mono text-xs text-muted-foreground">
+                      {result.phone_number} · {verdictLabel(result.verdict)}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </CardContent>
 
-              <div className="till-dock">
-                <button className="btn till-go" type="submit" disabled={checking}>
-                  {checking
-                    ? <><IconLoader /> Asking the network…</>
-                    : <>Check number <IconArrow /></>}
-                </button>
-                <button
-                  className="till-signout"
-                  type="button"
-                  onClick={() => { supabase.auth.signOut(); setAgent(null); setResult(null) }}
-                >
-                  <IconLogOut /> Sign out
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            <div className="mt-auto space-y-2 border-t border-border px-5 py-4">
+              <Button className="w-full" type="submit" disabled={checking}>
+                {checking
+                  ? <><IconLoader /> Asking the network…</>
+                  : <>Check number <IconArrow /></>}
+              </Button>
+              <Button
+                className="w-full"
+                type="button"
+                variant="ghost"
+                onClick={() => { supabase.auth.signOut(); setAgent(null); setResult(null) }}
+              >
+                <IconLogOut /> Sign out
+              </Button>
+            </div>
+          </form>
+        </Card>
       </div>
     </>
   )

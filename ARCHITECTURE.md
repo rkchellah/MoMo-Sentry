@@ -1,4 +1,4 @@
-# MoMo Sentry — architecture
+# MoMo Sentry - architecture
 
 This is the production plan, kept in the repo root.
 
@@ -6,7 +6,7 @@ Build the booth system **now** on Nokia Network as Code **sandbox**. Do not wait
 
 What this solves today: a real CAMARA call (canned numbers, same API contract), the till check is in-app, every check is logged, the owner sees who / which number / which booth / who never checked.
 
-What this does not solve: a live Lusaka SIM swap on a real `+260` line. Later: `NAC_MODE=production` plus live numbers — same code path.
+What this does not solve: a live Lusaka SIM swap on a real `+260` line. Later: `NAC_MODE=production` plus live numbers - same code path.
 
 ## Live hosts
 
@@ -57,7 +57,7 @@ flowchart TD
 
   H --> H1["POST .../sim-swap/sim-swap/v0/check<br/>phoneNumber, maxAge=72"]
   H1 --> H2{"HTTP 200?"}
-  H2 -->|no| HS["sim.error — unknown SIM history"]
+  H2 -->|no| HS["sim.error - unknown SIM history"]
   H2 -->|yes| H3["swapped true = SIM replaced in 72h<br/>swapped false = no swap in that window"]
   H3 --> H4["POST .../sim-swap/sim-swap/v0/retrieve-date<br/>latestSimChange"]
 
@@ -81,13 +81,13 @@ flowchart TD
   K --> L{"sim.error?"}
   L -->|yes| V0["CHECK_FAILED<br/>never treat as SAFE"]
   L -->|no| M{"sim.swapped OR device_swap.swapped?"}
-  M -->|yes| V1["STOP — do not pay"]
+  M -->|yes| V1["STOP - do not pay"]
   M -->|no| N{"device_swap.error OR device.error?"}
-  N -->|yes| V2["CAUTION — ask a question"]
+  N -->|yes| V2["CAUTION - ask a question"]
   N -->|no| O{"score"}
   O -->|gte 0.60| V1
   O -->|gte 0.25| V2
-  O -->|else| V3["SAFE — no swap in 72h<br/>not proof of identity"]
+  O -->|else| V3["SAFE - no swap in 72h<br/>not proof of identity"]
 
   V0 --> P["DeepSeek narrates the badge<br/>does not change it"]
   V1 --> P
@@ -101,7 +101,7 @@ flowchart TD
   Q --> S["Operations /sentry queue and Where map"]
 ```
 
-On a production MNO the same flowchart holds: set `NAC_MODE=production`, send E.164 `+260…`, and the operator’s CAMARA gateway answers `check` / `retrieve-date` / `connectivity` / `roaming` instead of Nokia’s `+999` simulators. Sandbox numbers that HTTP 400 or always return `swapped: true` are Nokia test-harness bugs, not a change to this intended contract — see BUG-006 and BUG-007.
+On a production MNO the same flowchart holds: set `NAC_MODE=production`, send E.164 `+260…`, and the operator’s CAMARA gateway answers `check` / `retrieve-date` / `connectivity` / `roaming` instead of Nokia’s `+999` simulators. Sandbox numbers that HTTP 400 or always return `swapped: true` are Nokia test-harness bugs, not a change to this intended contract - see BUG-006 and BUG-007.
 
 ---
 
@@ -111,7 +111,7 @@ MoMo Sentry and PAR-Map use the **same Supabase project**. That is a cost/ops ch
 
 PAR-Map’s real product is the loan map. It reads `customers`, `profiles`, `teams`, `kmz_layers`, `buffer_layers`, and Storage `kmz-files`. Auth is the cookie `sb-<projectRef>-auth-token` plus `middleware.ts`.
 
-MoMo Sentry is a **second app** on that project. Isolation is by **table + session key**, not by forking Postgres. The MoMo UI is **not** hosted on `par-map.vercel.app` — that leftover `/sentry` and `/agent` there is a dead demo.
+MoMo Sentry is a **second app** on that project. Isolation is by **table + session key**, not by forking Postgres. The MoMo UI is **not** hosted on `par-map.vercel.app` - that leftover `/sentry` and `/agent` there is a dead demo.
 
 ```
 Same Supabase project
@@ -144,10 +144,10 @@ Same Supabase project
 | Allow `CHECK_FAILED` on `fraud_checks` | No | Still shows SAFE/CAUTION/STOP |
 | Drop “authenticated can read checks” | No | Empty table / RLS errors |
 | Enable owner-only RLS on `booth_agents` | No | Agent list empty |
-| Alter `customers` / `profiles` | **Yes — never do this** | — |
+| Alter `customers` / `profiles` | **Yes - never do this** | - |
 | Switch MoMo to `sb-momo-auth-token` | No (different cookie) | No |
 
-So: **same database, two products.** PAR-Map flow is the loan map. We do not patch PAR-Map to ship MoMo. When you later delete `/sentry` and `/agent` from PAR-Map, that is a PAR-Map cleanup MR — not a MoMo schema change.
+So: **same database, two products.** PAR-Map flow is the loan map. We do not patch PAR-Map to ship MoMo. When you later delete `/sentry` and `/agent` from PAR-Map, that is a PAR-Map cleanup MR - not a MoMo schema change.
 
 `par-map.vercel.app` posting to the MoMo FastAPI without a MoMo JWT will 401 once `REQUIRE_AUTH=true`. That is the API, not the loan map.
 
@@ -174,7 +174,7 @@ Nokia’s sandbox does not match the table reliably:
 
 Show whatever the API returned. HTTP failure is **CHECK FAILED**, never SAFE.
 
-SAFE means no swap in the last 72 hours on this simulator — not that the person is legitimate.
+SAFE means no swap in the last 72 hours on this simulator - not that the person is legitimate.
 
 ---
 
@@ -202,7 +202,7 @@ Not a new product. Not a map delete.
 Same as the flowchart above, in code order:
 
 1. Accept only sandbox MSISDNs (`+999…`). Reject `+260` with `CHECK_FAILED`.
-2. `camara.run_checks` in parallel — CAMARA SIM Swap (`/check` + `/retrieve-date`), Device Swap (`/check` + `/retrieve-date`), Device Status (`/connectivity` + `/roaming`).
+2. `camara.run_checks` in parallel - CAMARA SIM Swap (`/check` + `/retrieve-date`), Device Swap (`/check` + `/retrieve-date`), Device Status (`/connectivity` + `/roaming`).
 3. `risk.py` scores. Intended CAMARA contract: `swapped: false` inside 72h is the SAFE path; `swapped: true` is STOP; SIM Swap HTTP error is `CHECK_FAILED` (unknown history, never SAFE). Device-status errors alone are CAUTION.
 4. One DeepSeek call to narrate the already-decided verdict. DeepSeek does not pick tools or set the badge.
 5. Agent UI: tap-to-check test customers + optional typed `+999`. Operations reads `fraud_checks`.
@@ -249,7 +249,7 @@ If `/health` reports `"degraded"` and `missing_env`, checks and owner claim will
 
 ## Deploy order
 
-1. Additive SQL (`supabase/migrations/002_production_auth.sql`) — new tables, extra columns, extra policies. **Do not drop** PAR-Map-era read policies.
+1. Additive SQL (`supabase/migrations/002_production_auth.sql`) - new tables, extra columns, extra policies. **Do not drop** PAR-Map-era read policies.
 2. Seed an owner in `momo_profiles` or claim via `/sentry` when `owner_needed` is true.
 3. MoMo frontend live with JWT (`https://momo-sentry-1.onrender.com`).
 4. `REQUIRE_AUTH=true` on Render.

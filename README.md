@@ -6,7 +6,7 @@ Mobile money fraud in Zambia follows a pattern. Someone convinces a telecom agen
 
 ## Live
 
-The app is two Render services. Free instances sleep after ~15 minutes idle — the first request can take a minute.
+The app is two Render services. Free instances sleep after ~15 minutes idle - the first request can take a minute.
 
 | What | URL |
 |---|---|
@@ -20,7 +20,20 @@ The app is two Render services. Free instances sleep after ~15 minutes idle — 
 
 Local: frontend `http://localhost:3000`, API `http://localhost:8000`.
 
-Confirm the API with `GET /health`. `"status": "ok"` and `"supabase": true` means it can log checks and create the first owner. `"degraded"` with `missing_env` means keys are not set on that host — see `BUGS.md` BUG-008 for the live API.
+Confirm the API with `GET /health`. `"status": "ok"` and `"supabase": true` means it can log checks and create the first owner. `"degraded"` with `missing_env` means keys are not set on that host - see `BUGS.md` BUG-008 for the live API.
+
+### Try the booth till
+
+Demo account for anyone who wants to open the till (`/agent`). **Not for operations** (`/sentry`) - that role is separate.
+
+| Field | Value |
+|---|---|
+| Name | test |
+| Email | test@momo.com |
+| Phone | 09712345678 |
+| Password | 123456789 |
+
+Open [Booth till](https://momo-sentry-1.onrender.com/agent), sign in with the email and password above, then run a number check.
 
 ---
 
@@ -28,30 +41,30 @@ Confirm the API with `GET /health`. `"status": "ok"` and `"supabase": true` mean
 
 A booth agent opens the till, types a customer's number, and hits check. The FastAPI backend calls Nokia Network as Code CAMARA APIs in parallel:
 
-- **SIM Swap** — was this SIM swapped in the last 72 hours?
-- **Device Swap** — did the SIM move to a new handset?
-- **Device Status** — is the device connected right now?
+- **SIM Swap** - was this SIM swapped in the last 72 hours?
+- **Device Swap** - did the SIM move to a new handset?
+- **Device Status** - is the device connected right now?
 
 `risk.py` sets the badge from those results. DeepSeek only explains it in one or two sentences. It does not pick tools or change the verdict.
 
-- **SAFE** — No SIM swap in the last 72 hours on this number. Not proof the person is legitimate.
-- **CAUTION** — Something is off. Ask a question before releasing.
-- **STOP** — SIM or device was swapped recently. Do not release cash.
-- **CHECK FAILED** — Nokia did not answer, or this environment cannot query that number. Do not treat as safe.
+- **SAFE** - No SIM swap in the last 72 hours on this number. Not proof the person is legitimate.
+- **CAUTION** - Something is off. Ask a question before releasing.
+- **STOP** - SIM or device was swapped recently. Do not release cash.
+- **CHECK FAILED** - Nokia did not answer, or this environment cannot query that number. Do not treat as safe.
 
-Every check is logged. Operations (`/sentry`) shows the queue and a Lusaka map — one pin per booth, coloured by the latest verdict.
+Every check is logged. Operations (`/sentry`) shows the queue and a Lusaka map - one pin per booth, coloured by the latest verdict.
 
 ---
 
 ## Two screens, two users
 
-**`/agent` — booth till**  
+**`/agent` - booth till**  
 Phone-width webapp for agents on a smartphone. Same dark AuthShell login as operations. After sign-in: number field, sandbox chips, booth picker, floating Check bar.
 
-**`/sentry` — operations**  
+**`/sentry` - operations**  
 Booth owner or analyst. Queue of every check, KPIs, repeat numbers, agents who never checked, Where map.
 
-**`/` — chooser**  
+**`/` - chooser**  
 Pick booth check or operations. The app does not auto-redirect to `/agent`.
 
 Roles live in `momo_profiles`. Agents cannot open operations. Owners cannot open the till. The first owner is claimed with `POST /setup/claim-owner` when `GET /setup/owner-needed` is true.
@@ -62,7 +75,7 @@ Roles live in `momo_profiles`. Agents cannot open operations. Owners cannot open
 
 Nokia is called in parallel. `risk.py` scores. DeepSeek narrates the already-decided badge. Session memory in `agent_sessions` can mention earlier flagged checks in this sitting.
 
-SIM swap HTTP failure is always **CHECK FAILED**, never SAFE. The Nokia sandbox is not a clean scenario table — STOP chips can 400, and SAFE chips can come back `swapped: true`. That is Nokia, not a down API. Logged in `BUGS.md`.
+SIM swap HTTP failure is always **CHECK FAILED**, never SAFE. The Nokia sandbox is not a clean scenario table - STOP chips can 400, and SAFE chips can come back `swapped: true`. That is Nokia, not a down API. Logged in `BUGS.md`.
 
 ---
 
@@ -70,15 +83,15 @@ SIM swap HTTP failure is always **CHECK FAILED**, never SAFE. The Nokia sandbox 
 
 | Layer | Technology |
 |---|---|
-| CAMARA APIs | Nokia Network as Code — SIM Swap, Device Swap, Device Status |
+| CAMARA APIs | Nokia Network as Code - SIM Swap, Device Swap, Device Status |
 | Backend | Python FastAPI (`backend/`) |
 | Narration | DeepSeek (`deepseek-chat`) |
-| Database | Supabase (PostgreSQL) — shared with PAR-Map; do not touch PAR-Map tables |
+| Database | Supabase (PostgreSQL) - shared with PAR-Map; do not touch PAR-Map tables |
 | Frontend | Next.js in this repo (`frontend/`) |
 | Icons | Lucide |
 | Map | Mapbox + Leaflet |
 | Auth | Supabase Auth, cookie `sb-momo-auth-token` |
-| Deploy | Render — API `momo-sentry.onrender.com`, web `momo-sentry-1.onrender.com` |
+| Deploy | Render - API `momo-sentry.onrender.com`, web `momo-sentry-1.onrender.com` |
 
 ---
 
@@ -89,7 +102,7 @@ Agent types a number
        ↓
 POST /check  {phone_number, agent_location} + Bearer JWT
        ↓
-camara.run_checks — SIM Swap + Device Swap + Device Status in parallel
+camara.run_checks - SIM Swap + Device Swap + Device Status in parallel
        ↓
 risk.py sets SAFE / CAUTION / STOP / CHECK_FAILED
        ↓
@@ -106,7 +119,7 @@ Full plan: `ARCHITECTURE.md`. Open issues: `BUGS.md`.
 
 ## Running locally
 
-Two terminals. Nokia key is `NAC_API_KEY` in `backend/.env` — never `NEXT_PUBLIC_*`.
+Two terminals. Nokia key is `NAC_API_KEY` in `backend/.env` - never `NEXT_PUBLIC_*`.
 
 ```bash
 # API
@@ -139,7 +152,7 @@ Password reset: add `http://localhost:3000/reset` and `https://momo-sentry-1.onr
 
 Two Web Services (`render.yaml`).
 
-### API — https://momo-sentry.onrender.com
+### API - https://momo-sentry.onrender.com
 
 Root `backend/`. Start: `uvicorn main:app --host 0.0.0.0 --port $PORT`. Health: `/health`.
 
@@ -155,7 +168,7 @@ REQUIRE_AUTH=true
 PYTHON_VERSION=3.12.8
 ```
 
-### Frontend — https://momo-sentry-1.onrender.com
+### Frontend - https://momo-sentry-1.onrender.com
 
 Root `frontend/`. Build `npm install && npm run build`. Start `npm start`.
 
@@ -189,7 +202,7 @@ The chips on the till are the intended story. Trust the badge on screen, not the
 
 ## Database
 
-Same Supabase project as PAR-Map. Isolation is by table and auth cookie, not a second database — see `ARCHITECTURE.md`.
+Same Supabase project as PAR-Map. Isolation is by table and auth cookie, not a second database - see `ARCHITECTURE.md`.
 
 ```bash
 supabase/migrations/001_fraud_checks.sql

@@ -1,9 +1,9 @@
 export const SANDBOX_CUSTOMERS = [
   { label: 'SAFE customer', phone: '+99999991000', hint: 'No swap' },
   { label: 'SAFE (alt)', phone: '+99999991001', hint: 'Clean' },
-  { label: 'STOP — SIM swap', phone: '+99999990400', hint: 'Do not pay' },
-  { label: 'STOP — SIM swap (alt)', phone: '+99999990404', hint: 'Do not pay' },
-  { label: 'CAUTION — device', phone: '+99999990422', hint: 'Ask a question' },
+  { label: 'STOP - SIM swap', phone: '+99999990400', hint: 'Do not pay' },
+  { label: 'STOP - SIM swap (alt)', phone: '+99999990404', hint: 'Do not pay' },
+  { label: 'CAUTION - device', phone: '+99999990422', hint: 'Ask a question' },
 ] as const
 
 export function apiBase(): string {
