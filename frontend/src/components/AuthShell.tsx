@@ -1,11 +1,10 @@
 import Head from 'next/head'
 import Link from 'next/link'
 import { type InputHTMLAttributes, type ReactNode } from 'react'
-import { AlertCircle, Eye, EyeOff, ShieldCheck } from 'lucide-react'
+import { AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { BrandLockup } from './icons'
 import { ThemeToggle } from './ThemeToggle'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -72,10 +71,7 @@ export function AuthShell({
             />
             <div className="relative flex h-full flex-col justify-between p-12 xl:px-16">
               <div className="flex flex-col gap-5">
-                <Badge variant="secondary" className="w-fit">
-                  <ShieldCheck data-icon="inline-start" />
-                  MoMo Sentry
-                </Badge>
+                <BrandLockup />
                 <h2 className="max-w-sm text-3xl font-normal tracking-tight text-foreground">
                   CAMARA SIM Swap, Device Swap, and Device Status - before payout.
                 </h2>

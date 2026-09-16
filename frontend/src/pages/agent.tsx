@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { supabase } from '../lib/supabase'
-import { IconArrow, IconLoader, IconLogOut } from '../components/icons'
+import { IconArrow, IconLoader, IconLogOut, BrandLockup } from '../components/icons'
 import { Select } from '../components/Select'
 import { getBoothLocations } from '../lib/fraudService'
 import { BoothLocation, Verdict } from '../types/sentry'
@@ -194,9 +194,9 @@ export default function AgentPage() {
       <div className="min-h-dvh bg-muted/40 px-4 py-6 sm:px-6">
         <Card className="mx-auto flex min-h-[calc(100dvh-3rem)] max-w-md flex-col overflow-hidden">
           <header className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
-            <div>
-              <p className="text-xs font-normal uppercase tracking-wider text-muted-foreground">MoMo Sentry</p>
-              <h1 className="text-lg font-normal tracking-tight">Number check</h1>
+            <div className="min-w-0">
+              <BrandLockup />
+              <h1 className="mt-2 text-lg font-normal tracking-tight">Number check</h1>
             </div>
             <ThemeToggle />
           </header>
