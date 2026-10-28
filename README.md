@@ -45,7 +45,7 @@ Demo owner account for the operations queue and the Lusaka map (/sentry). Sandbo
 | Phone | 09712345678 |
 | Password | 123456789 |
 
-Open [Operations till](https://momo-sentry-1.onrender.com/sentry), sign in with the email and password above. This account cannot open the booth till; use the till demo account for that.
+Open [Operations](https://momo-sentry-1.onrender.com/sentry), sign in with the email and password above. This account cannot open the booth till; use the till demo account for that.
 
 ---
 
